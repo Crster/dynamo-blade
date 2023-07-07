@@ -37,7 +37,7 @@ export default class DynamoBladeDocument {
   }
 
   async get<T>(
-    field: Array<string>,
+    field?: Array<string>,
     next?: string
   ): Promise<{ item: T; next?: string }> {
     if (typeof field === "string") {

@@ -31,4 +31,8 @@ export default class DynamoBlade {
   open(collection: string) {
     return new DynamoBladeCollection(this, [], collection);
   }
+
+  async init() {
+    throw new Error("Not yet implemented")
+  }
 }
