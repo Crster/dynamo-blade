@@ -20,7 +20,7 @@ test("insert artist", async () => {
 
 test("get artist#john", async () => {
   const result = await db.open("artist").is("john").get();
-  expect(result).toHaveProperty("item.artist#john.PK", "john");
+  expect(result).toHaveProperty("item.artist.PK", "john");
 });
 
 test("insert artist album", async () => {
@@ -71,5 +71,5 @@ test("get artist#john", async () => {
     .open("album")
     .is("love1")
     .get();
-  expect(result).toHaveProperty("item.artist#john.album.love1.price", 210);
+  expect(result).toHaveProperty("item.album.love1.price", 210);
 });

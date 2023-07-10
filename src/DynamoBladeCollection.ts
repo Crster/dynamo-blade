@@ -3,11 +3,10 @@ import {
   QueryCommand,
   PutCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { IResult } from "./IResult";
 import DynamoBlade from "./DynamoBlade";
 import DynamoBladeDocument from "./DynamoBladeDocument";
 import { buildKey, buildResult, decodeNext, encodeNext } from "./utils/index";
-
-type Result<T> = { item: T; next?: string };
 
 export default class DynamoBladeCollection {
   private blade: DynamoBlade;
@@ -28,7 +27,7 @@ export default class DynamoBladeCollection {
     );
   }
 
-  async get<T>(next?: string): Promise<Result<T>> {
+  async get<T>(next?: string): Promise<IResult<T>> {
     const { client, tableName, indexName } = this.blade.option;
     const docClient = DynamoDBDocumentClient.from(client);
 
@@ -79,7 +78,7 @@ export default class DynamoBladeCollection {
     condition: string,
     value?: any,
     next?: string
-  ): Promise<Result<T>> {
+  ): Promise<IResult<T>> {
     const { client, tableName, indexName } = this.blade.option;
     const docClient = DynamoDBDocumentClient.from(client);
 

@@ -4,6 +4,7 @@ import {
   DeleteCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { IResult } from "./IResult";
 import DynamoBlade from "./DynamoBlade";
 import DynamoBladeCollection from "./DynamoBladeCollection";
 import { buildKey, buildResult, decodeNext, encodeNext } from "./utils/index";
@@ -39,7 +40,7 @@ export default class DynamoBladeDocument {
   async get<T>(
     field?: Array<string>,
     next?: string
-  ): Promise<{ item: T; next?: string }> {
+  ): Promise<IResult<T>> {
     if (typeof field === "string") {
       next = field;
       field = [];

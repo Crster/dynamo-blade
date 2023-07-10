@@ -4,24 +4,33 @@ import DynamoBlade from "../DynamoBlade";
 export default function buildResult<T>(
   blade: DynamoBlade,
   results: Array<Record<string, any>>
-): T {
-  const { indexName, hashKey, sortKey } = blade.option;
+): Record<string, Record<string, T>> {
+  const { indexName, hashKey, sortKey, separator } = blade.option;
   const ret = new Map();
 
-  for (let index = 0; index < results.length; index++) {
-    const element = new Map(Object.entries(results[index]));
+  for (const result of results) {
+    const item = new Map(Object.entries(result));
 
-    const pk = element.get(hashKey);
-    const sk = element.get(sortKey);
-    const gsk = element.get(`${indexName}${sortKey}`);
-    const newPath = pk === sk ? pk : `${pk}.${sk.match(/\w+/gm).join(".")}`;
+    const [rootPropertyName, rootPropertyKey] = item
+      .get(hashKey)
+      .split(separator);
+    const propertyName = item.get(`${indexName}${hashKey}`);
+    const propertyKey = item.get(`${indexName}${sortKey}`);
 
-    element.set(hashKey, gsk);
-    element.delete(sortKey);
-    element.delete(`${indexName}${hashKey}`);
-    element.delete(`${indexName}${sortKey}`);
+    item.delete(`${indexName}${hashKey}`);
+    item.delete(`${indexName}${sortKey}`);
+    item.delete(sortKey);
 
-    ret.set(newPath, Object.fromEntries(element));
+    item.set(hashKey, propertyKey);
+
+    if (propertyKey === rootPropertyKey) {
+      ret.set(rootPropertyName, Object.fromEntries(item));
+    } else {
+      ret.set(
+        `${propertyName}.${propertyKey}`.replace(rootPropertyName + ".", ""),
+        Object.fromEntries(item)
+      );
+    }
   }
 
   return unflatten(Object.fromEntries(ret), { object: true });
