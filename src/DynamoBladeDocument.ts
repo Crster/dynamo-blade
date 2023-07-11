@@ -112,7 +112,7 @@ export default class DynamoBladeDocument {
             );
             propValues.push({
               prop: prop2,
-              val: values[prop][prop2],
+              val: values[prop][prop2] != null ? values[prop][prop2] : "",
             });
           }
           break;
@@ -132,7 +132,8 @@ export default class DynamoBladeDocument {
             remValues.push(`#prop${propValues.length}`);
             propValues.push({
               prop: prop2,
-              val: null,
+              val: "",
+              remove: true,
             });
           }
           break;
@@ -151,7 +152,10 @@ export default class DynamoBladeDocument {
           setValues.push(
             `#prop${propValues.length} = :val${propValues.length}`
           );
-          propValues.push({ prop, val: values[prop] });
+          propValues.push({
+            prop,
+            val: values[prop] != null ? values[prop] : "",
+          });
           break;
       }
     }
@@ -176,10 +180,11 @@ export default class DynamoBladeDocument {
     let ExpressionAttributeValues = {};
     let ExpressionAttributeNames = {};
     propValues.forEach((item, index) => {
-      if (item.val != null) {
+      if (!item.remove) {
         ExpressionAttributeValues[`:val${index}`] = item.val;
-        ExpressionAttributeNames[`#prop${index}`] = item.prop;
       }
+      
+      ExpressionAttributeNames[`#prop${index}`] = item.prop;
     });
 
     const command = new UpdateCommand({
