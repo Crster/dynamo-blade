@@ -111,6 +111,14 @@ test("insert song", async () => {
   expect(result).toBe(true);
 })
 
+test("update song", async () => {
+  const result = await db.open("artist").is("john").open("album").is("love1").open("song").is("wat").set({
+    title: "What ever! Rock version",
+  })
+
+  expect(result).toBe(true);
+})
+
 test("getitem song", async () => {
   const result = await db
     .open("artist")
@@ -135,4 +143,42 @@ test("get all songs", async () => {
   const result = await db.open("artist.album.song").get()
 
   expect(result.getItems()).toHaveLength(1);
+});
+
+test("get all songs", async () => {
+  await db.open("artist").is("pre").open("album").add("al1", {
+    title: "All love 1",
+    price: 123,
+    rating: 4,
+    hasCollab: true,
+  });
+
+  await db.open("artist").is("pre").open("album").add("al2", {
+    title: "All love 2",
+    price: 234,
+    rating: 4,
+    hasCollab: true,
+  });
+
+  await db.open("artist").is("pre").open("album").add("al3", {
+    title: "All love 3",
+    price: 345,
+    rating: 4,
+    hasCollab: true,
+  });
+
+  const albums = await db.open("artist.album").where("rating", ">=", 4)
+  const promises = []
+  for (const album of albums.getItems()) {
+    promises.push(db.open("artist").is("pre").open("album").is(album.PK).set({
+      hasCollab: false,
+      $add: {
+        price: 1
+      }
+    }))
+  }
+
+  const results = await Promise.all(promises)
+
+  expect(results).toHaveLength(albums.getResult().Count);
 });

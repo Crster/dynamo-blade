@@ -176,10 +176,10 @@ export default class DynamoBladeDocument {
     let ExpressionAttributeValues = {};
     let ExpressionAttributeNames = {};
     propValues.forEach((item, index) => {
-      if (item.val) {
+      if (item.val != null) {
         ExpressionAttributeValues[`:val${index}`] = item.val;
+        ExpressionAttributeNames[`#prop${index}`] = item.prop;
       }
-      ExpressionAttributeNames[`#prop${index}`] = item.prop;
     });
 
     const command = new UpdateCommand({
