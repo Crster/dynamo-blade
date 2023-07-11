@@ -3,10 +3,10 @@ import {
   QueryCommand,
   PutCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { IResult } from "./IResult";
 import DynamoBlade from "./DynamoBlade";
 import DynamoBladeDocument from "./DynamoBladeDocument";
-import { buildKey, buildResult, decodeNext, encodeNext } from "./utils/index";
+import { buildKey, decodeNext } from "./utils/index";
+import GetResult from "./GetResult";
 
 export default class DynamoBladeCollection {
   private blade: DynamoBlade;
@@ -27,7 +27,7 @@ export default class DynamoBladeCollection {
     );
   }
 
-  async get<T>(next?: string): Promise<IResult<T>> {
+  async get(next?: string): Promise<GetResult> {
     const { client, tableName, indexName } = this.blade.option;
     const docClient = DynamoDBDocumentClient.from(client);
 
@@ -42,13 +42,10 @@ export default class DynamoBladeCollection {
     });
 
     const result = await docClient.send(command);
-    return {
-      item: buildResult<T>(this.blade, result.Items),
-      next: encodeNext(result.LastEvaluatedKey),
-    };
+    return new GetResult(this.blade, result, pkey.collections);
   }
 
-  async add(key: string, value: any): Promise<boolean> {
+  async add<T>(key: string, value: Partial<T>): Promise<boolean> {
     const { client, tableName, separator, indexName, hashKey, sortKey } =
       this.blade.option;
     const docClient = DynamoDBDocumentClient.from(client);
@@ -78,7 +75,7 @@ export default class DynamoBladeCollection {
     condition: string,
     value?: any,
     next?: string
-  ): Promise<IResult<T>> {
+  ): Promise<GetResult> {
     const { client, tableName, indexName } = this.blade.option;
     const docClient = DynamoDBDocumentClient.from(client);
 
@@ -150,13 +147,10 @@ export default class DynamoBladeCollection {
       ExpressionAttributeNames: Object.fromEntries(fieldNames),
       ExpressionAttributeValues: Object.fromEntries(keyValues),
       ExclusiveStartKey: decodeNext(next),
-      ScanIndexForward: !["<", ">", "<=", ">=", "between"].includes(condition)
+      ScanIndexForward: !["<", ">", "<=", ">=", "between"].includes(condition),
     });
 
     const result = await docClient.send(command);
-    return {
-      item: buildResult<T>(this.blade, result.Items),
-      next: encodeNext(result.LastEvaluatedKey),
-    };
+    return new GetResult(this.blade, result, pkey.collections);
   }
 }

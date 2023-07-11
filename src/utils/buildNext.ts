@@ -1,6 +1,10 @@
 export function decodeNext(next: string) {
   if (next) {
-    return JSON.parse(Buffer.from(next, "base64").toString());
+    try {
+      return JSON.parse(Buffer.from(next, "base64").toString());
+    } catch {
+      throw new Error("Invalid next value");
+    }
   }
 }
 

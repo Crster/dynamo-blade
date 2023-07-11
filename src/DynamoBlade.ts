@@ -1,5 +1,6 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { CreateTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import DynamoBladeCollection from "./DynamoBladeCollection";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
 type Option = {
   tableName: string;
@@ -32,7 +33,72 @@ export default class DynamoBlade {
     return new DynamoBladeCollection(this, [], collection);
   }
 
-  async init() {
-    throw new Error("Not yet implemented")
+  async init(
+    billingMode: "PROVISIONED" | "PAY_PER_REQUEST" = "PAY_PER_REQUEST"
+  ) {
+    const { client, tableName, hashKey, sortKey, indexName } = this.option;
+    const docClient = DynamoDBDocumentClient.from(client);
+
+    const command = new CreateTableCommand({
+      TableName: tableName,
+      KeySchema: [
+        {
+          AttributeName: hashKey,
+          KeyType: "HASH",
+        },
+        {
+          AttributeName: sortKey,
+          KeyType: "RANGE",
+        },
+      ],
+      AttributeDefinitions: [
+        {
+          AttributeName: hashKey,
+          AttributeType: "S",
+        },
+        {
+          AttributeName: sortKey,
+          AttributeType: "S",
+        },
+        {
+          AttributeName: `${indexName}${hashKey}`,
+          AttributeType: "S",
+        },
+        {
+          AttributeName: `${indexName}${sortKey}`,
+          AttributeType: "S",
+        },
+      ],
+      GlobalSecondaryIndexes: [
+        {
+          IndexName: indexName,
+          KeySchema: [
+            {
+              AttributeName: `${indexName}${hashKey}`,
+              KeyType: "HASH",
+            },
+            {
+              AttributeName: `${indexName}${sortKey}`,
+              KeyType: "RANGE",
+            },
+          ],
+          Projection: {
+            ProjectionType: "ALL",
+          },
+        },
+      ],
+      BillingMode: billingMode,
+    });
+
+    try {
+      await docClient.send(command);
+      return true;
+    } catch (err) {
+      if (err.name === "ResourceInUseException") {
+        return true;
+      }
+
+      return false;
+    }
   }
 }

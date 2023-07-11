@@ -1,4 +1,4 @@
 import DynamoBlade from "./DynamoBlade";
-export { IResult } from "./IResult";
+export { default as GetResult } from "./GetResult";
 
 export default DynamoBlade;

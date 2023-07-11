@@ -2,11 +2,17 @@ const { default: DynamoBlade } = require("./dist/index");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 
 const db = new DynamoBlade({
-  tableName: "simple",
+  tableName: "simple_one",
   client: new DynamoDBClient({
     region: "local",
     endpoint: "http://localhost:8000",
   }),
+});
+
+test("test init", async () => {
+  const result = await db.init()
+
+  expect(result).toBe(true);
 });
 
 test("insert artist", async () => {
@@ -20,7 +26,7 @@ test("insert artist", async () => {
 
 test("get artist#john", async () => {
   const result = await db.open("artist").is("john").get();
-  expect(result).toHaveProperty("item.artist.PK", "john");
+  expect(result.getItem()).toHaveProperty("PK", "john");
 });
 
 test("insert artist album", async () => {
@@ -64,12 +70,69 @@ test("modify artist album 3", async () => {
   expect(result).toBe(true);
 });
 
-test("get artist#john", async () => {
+test("get album#love1", async () => {
   const result = await db
     .open("artist")
     .is("john")
     .open("album")
     .is("love1")
     .get();
-  expect(result).toHaveProperty("item.album.love1.price", 210);
+
+  expect(result.getItem()).toHaveProperty("price", 210);
+});
+
+test("getitem of album", async () => {
+  const result = await db
+    .open("artist")
+    .is("john")
+    .open("album")
+    .get()
+
+  expect(result.getItem("love1")).toHaveProperty("price", 210);
+});
+
+test("getitems of album", async () => {
+  const result = await db
+    .open("artist")
+    .is("john")
+    .open("album")
+    .get()
+
+  expect(result.getItems().find(ii => ii.PK === "love1")).toHaveProperty("price", 210);
+});
+
+test("insert song", async () => {
+  const result = await db.open("artist").is("john").open("album").is("love1").open("song").add("wat", {
+    title: "What ever!",
+    genre: "Rock",
+    hasAward: false
+  })
+
+  expect(result).toBe(true);
+})
+
+test("getitem song", async () => {
+  const result = await db
+    .open("artist")
+    .is("john")
+    .open("album")
+    .get()
+
+  expect(result.getItem("song", "wat")).toHaveProperty("genre", "Rock");
+});
+
+test("get album love song", async () => {
+  const result = await db
+    .open("artist")
+    .is("john")
+    .open("album")
+    .get()
+
+  expect(result.getItem("love1")).toHaveProperty("price", 210);
+});
+
+test("get all songs", async () => {
+  const result = await db.open("artist.album.song").get()
+
+  expect(result.getItems()).toHaveLength(1);
 });

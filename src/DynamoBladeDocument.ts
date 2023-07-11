@@ -4,10 +4,10 @@ import {
   DeleteCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { IResult } from "./IResult";
 import DynamoBlade from "./DynamoBlade";
 import DynamoBladeCollection from "./DynamoBladeCollection";
-import { buildKey, buildResult, decodeNext, encodeNext } from "./utils/index";
+import { buildKey, decodeNext } from "./utils/index";
+import GetResult from "./GetResult";
 
 export default class DynamoBladeDocument {
   private blade: DynamoBlade;
@@ -37,10 +37,7 @@ export default class DynamoBladeDocument {
     return pkey.sortKey.value;
   }
 
-  async get<T>(
-    field?: Array<string>,
-    next?: string
-  ): Promise<IResult<T>> {
+  async get(field?: Array<string>, next?: string): Promise<GetResult> {
     if (typeof field === "string") {
       next = field;
       field = [];
@@ -88,13 +85,10 @@ export default class DynamoBladeDocument {
     });
 
     const result = await docClient.send(command);
-    return {
-      item: buildResult<T>(this.blade, result.Items),
-      next: encodeNext(result.LastEvaluatedKey),
-    };
+    return new GetResult(this.blade, result, pkey.collections, this.key);
   }
 
-  async set(values: Record<string, any>) {
+  async set<T>(values: Partial<T>) {
     const { client, tableName, separator } = this.blade.option;
     const docClient = DynamoDBDocumentClient.from(client);
 
