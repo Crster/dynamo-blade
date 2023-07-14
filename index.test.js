@@ -2,7 +2,7 @@ const { default: DynamoBlade } = require("./dist/index");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 
 const db = new DynamoBlade({
-  tableName: "simple_one",
+  tableName: "testdb",
   client: new DynamoDBClient({
     region: "local",
     endpoint: "http://localhost:8000",
@@ -10,182 +10,269 @@ const db = new DynamoBlade({
 });
 
 test("test init", async () => {
-  const result = await db.init()
-
+  const result = await db.init();
   expect(result).toBe(true);
 });
 
-// test("insert artist", async () => {
-//   const result = await db.open("artist").add("john", {
-//     name: "John Doe",
-//     age: 10,
-//   });
+test("add artist", async () => {
+  const cmd = [
+    db.open("artist").add("001", {
+      name: "Artist 1",
+      age: 30,
+    }),
+    db.open("artist").add("002", {
+      name: "Artist 2",
+      age: 23,
+    }),
+    db.open("artist").add("003", {
+      name: "Artist 3",
+      age: 25,
+    }),
+  ];
 
-//   expect(result).toBe(true);
-// });
+  const results = await Promise.all(cmd);
+  expect(results).toStrictEqual([true, true, true]);
+});
 
-// test("get artist#john", async () => {
-//   const result = await db.open("artist").is("john").get();
-//   expect(result.getItem()).toHaveProperty("PK", "john");
-// });
+test("add album", async () => {
+  const cmd = [
+    db.open("artist").is("001").open("album").add("ab001", {
+      title: "Album 001",
+      rating: 5,
+    }),
+    db.open("artist").is("001").open("album").add("ab002", {
+      title: "Album 002",
+      rating: 5,
+    }),
+    db.open("artist").is("001").open("album").add("ab003", {
+      title: "Album 003",
+      rating: 3,
+    }),
+    db.open("artist").is("002").open("album").add("ab001", {
+      title: "Album 001",
+      rating: 4,
+    }),
+    db.open("artist").is("002").open("album").add("ab002", {
+      title: "Album 002",
+      rating: 3,
+    }),
+    db.open("artist").is("002").open("album").add("ab003", {
+      title: "Album 003",
+      rating: 5,
+    }),
+    db.open("artist").is("003").open("album").add("ab001", {
+      title: "Album 001",
+      rating: 3,
+    }),
+  ];
 
-// test("insert artist album", async () => {
-//   const result = await db.open("artist").is("john").open("album").add("j1", {
-//     title: "J1",
-//     price: 200,
-//     rating: 5,
-//   });
+  const results = await Promise.all(cmd);
+  expect(results).toStrictEqual([true, true, true, true, true, true, true]);
+});
 
-//   expect(result).toBe(true);
-// });
-
-// test("insert artist album 2", async () => {
-//   const result = await db.open("artist").is("john").open("album").add("j2", {
-//     title: "J2",
-//     price: 150,
-//     rating: 3,
-//   });
-
-//   expect(result).toBe(true);
-// });
-
-// test("insert artist album 3", async () => {
-//   const result = await db.open("artist").is("john").open("album").add("love1", {
-//     title: "Love J2 Albumn",
-//     price: 300,
-//     rating: 4,
-//   });
-
-//   expect(result).toBe(true);
-// });
-
-// test("modify artist album 3", async () => {
-//   const result = await db
-//     .open("artist")
-//     .is("john")
-//     .open("album")
-//     .is("love1")
-//     .set({ price: 210 });
-
-//   expect(result).toBe(true);
-// });
-
-// test("get album#love1", async () => {
-//   const result = await db
-//     .open("artist")
-//     .is("john")
-//     .open("album")
-//     .is("love1")
-//     .get();
-
-//   expect(result.getItem()).toHaveProperty("price", 210);
-// });
-
-// test("getitem of album", async () => {
-//   const result = await db
-//     .open("artist")
-//     .is("john")
-//     .open("album")
-//     .get()
-
-//   expect(result.getItem("love1")).toHaveProperty("price", 210);
-// });
-
-// test("getitems of album", async () => {
-//   const result = await db
-//     .open("artist")
-//     .is("john")
-//     .open("album")
-//     .get()
-
-//   expect(result.getItems().find(ii => ii.PK === "love1")).toHaveProperty("price", 210);
-// });
-
-// test("insert song", async () => {
-//   const result = await db.open("artist").is("john").open("album").is("love1").open("song").add("wat", {
-//     title: "What ever!",
-//     genre: "Rock",
-//     hasAward: false
-//   })
-
-//   expect(result).toBe(true);
-// })
-
-// test("update song", async () => {
-//   const result = await db.open("artist").is("john").open("album").is("love1").open("song").is("wat").set({
-//     title: "What ever! Rock version",
-//   })
-
-//   expect(result).toBe(true);
-// })
-
-// test("getitem song", async () => {
-//   const result = await db
-//     .open("artist")
-//     .is("john")
-//     .open("album")
-//     .get()
-
-//   expect(result.getItem("song", "wat")).toHaveProperty("genre", "Rock");
-// });
-
-// test("get album love song", async () => {
-//   const result = await db
-//     .open("artist")
-//     .is("john")
-//     .open("album")
-//     .get()
-
-//   expect(result.getItem("love1")).toHaveProperty("price", 210);
-// });
-
-// test("get all songs", async () => {
-//   const result = await db.open("artist.album.song").get()
-
-//   expect(result.getItems()).toHaveLength(1);
-// });
-
-test("update album 2", async () => {
-  await db.open("artist").is("pre").open("album").add("al1", {
-    title: "All love 1",
-    price: 123,
-    rating: 4,
-    subject: "thunder",
-    hasCollab: true,
-  });
-
-  await db.open("artist").is("pre").open("album").add("al2", {
-    title: "All love 2",
-    price: 234,
-    rating: 4,
-    subject: "snow",
-    hasCollab: true,
-  });
-
-  await db.open("artist").is("pre").open("album").add("al3", {
-    title: "All love 3",
-    price: 345,
-    rating: 4,
-    subject: "rain",
-    hasCollab: true,
-  });
-
-  const albums = await db.open("artist.album").where("rating", ">=", 4)
-  const promises = []
-  for (const album of albums.getItems()) {
-    promises.push(db.open("artist").is("pre").open("album").is(album.PK).set({
-      rating: false,
-      subject: null,
-      $remove: {
+test("add song", async () => {
+  const cmd = [
+    db
+      .open("artist")
+      .is("001")
+      .open("album")
+      .is("ab001")
+      .open("song")
+      .add("s1", {
+        title: "Song Number 1",
+        genre: "Rock",
+        length: 5,
         hasCollab: true,
-      },
-      $add: {
-        price: 1
-      }
-    }))
-  }
+      }),
+    db
+      .open("artist")
+      .is("001")
+      .open("album")
+      .is("ab001")
+      .open("song")
+      .add("s2", {
+        title: "Song Number 2",
+        genre: "Rock",
+        length: 4.5,
+        hasCollab: false,
+      }),
+    db
+      .open("artist")
+      .is("001")
+      .open("album")
+      .is("ab001")
+      .open("song")
+      .add("s3", {
+        title: "Song Number 3",
+        genre: "Alternatives",
+        length: 4.5,
+        hasCollab: false,
+      }),
+    db
+      .open("artist")
+      .is("001")
+      .open("album")
+      .is("ab002")
+      .open("song")
+      .add("s4", {
+        title: "Song Number 4",
+        genre: "Alternatives",
+        length: 3,
+        hasCollab: false,
+      }),
+    db
+      .open("artist")
+      .is("001")
+      .open("album")
+      .is("ab002")
+      .open("song")
+      .add("s5", {
+        title: "Song Number 5",
+        genre: "Rock",
+        length: 3,
+        hasCollab: false,
+      }),
+    db
+      .open("artist")
+      .is("003")
+      .open("album")
+      .is("ab001")
+      .open("song")
+      .add("s1", {
+        title: "Song #1",
+        genre: "Pop",
+        length: 5,
+        hasCollab: true,
+        collabs: [
+          db.open("artist").is("002").toString(),
+          db.open("artist").is("001").toString(),
+        ],
+      }),
+    db
+      .open("artist")
+      .is("003")
+      .open("album")
+      .is("ab001")
+      .open("song")
+      .add("s2", {
+        title: "Song #2",
+        genre: "Rock",
+        length: 5,
+        hasCollab: true,
+        collabs: [
+          db.open("artist").is("002").toString(),
+          db.open("artist").is("001").toString(),
+        ],
+      }),
+  ];
 
-  const results = await Promise.all(promises)
+  const results = await Promise.all(cmd);
+  expect(results).toStrictEqual([true, true, true, true, true, true, true]);
+});
 
-  expect(results).toHaveLength(albums.getResult().Count);
+test("get all artist", async () => {
+  const results = await db.open("artist").get();
+
+  expect(results.getItems().length).toBe(3);
+});
+
+test("get all songs", async () => {
+  const results = await db.open("artist.album.song").get();
+
+  expect(results.getItems().length).toBe(7);
+});
+
+test("update value", async () => {
+  const cmd = [
+    db
+      .open("artist")
+      .is("001")
+      .open("album")
+      .is("ab001")
+      .set({
+        onsale: true,
+        $add: {
+          rating: -1,
+        },
+      }),
+    db
+      .open("artist")
+      .is("001")
+      .open("album")
+      .is("ab001")
+      .set({
+        $set: {
+          awards: new Set(["VIP1", "VIP2", "ROCK1"]),
+          release: new Date().toISOString(),
+        },
+        $add: {
+          rating: -1,
+        },
+      }),
+  ];
+
+  const results = await Promise.all(cmd);
+  expect(results).toStrictEqual([true, true]);
+});
+
+test("remove", async () => {
+  const cmd = [
+    db
+      .open("artist")
+      .is("001")
+      .open("album")
+      .is("ab001")
+      .set({
+        $delete: {
+          awards: new Set(["VIP2"]),
+        },
+      }),
+    db.open("artist").is("001").open("album").is("ab003").remove(),
+  ];
+
+  const results = await Promise.all(cmd);
+  expect(results).toStrictEqual([true, true]);
+});
+
+test("get deleted album", async () => {
+  const result = await db
+    .open("artist")
+    .is("001")
+    .open("album")
+    .is("ab003")
+    .get();
+
+  expect(result.hasItem()).toBe(false);
+});
+
+test("verify updated album", async () => {
+  const result = await db
+    .open("artist")
+    .is("001")
+    .open("album")
+    .where("onsale", "=", true);
+
+  expect(result.getItems().at(0)).toHaveProperty(
+    "awards",
+    new Set(["ROCK1", "VIP1"])
+  );
+});
+
+test("get albumn song", async () => {
+  const result = await db
+    .open("artist")
+    .is("001")
+    .open("album")
+    .is("ab001")
+    .get();
+  const result2 = await db
+    .open("artist")
+    .is("001")
+    .open("album")
+    .is("ab")
+    .get();
+
+  expect([result.getItems().length, result2.getItems().length]).toStrictEqual([
+    1, 2,
+  ]);
 });

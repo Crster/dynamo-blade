@@ -1,5 +1,5 @@
 import { QueryCommandOutput } from "@aws-sdk/lib-dynamodb";
-import { buildKey, encodeNext } from "./utils";
+import { encodeNext } from "./utils";
 import DynamoBlade from "./DynamoBlade";
 
 export default class GetResult {
@@ -20,14 +20,16 @@ export default class GetResult {
     this._key = key;
   }
 
-  hasItem(collection: string) {
+  hasItem(collection?: string) {
     const { indexName, hashKey } = this._blade.option;
-    let ret = false;
+    const _collection = collection
+      ? [[...this._collections].splice(-1), collection].join(".")
+      : this._collections.join(".");
+    let ret: boolean = false;
 
     for (let xx = 0; xx < this._output.Items.length; xx++) {
       const item = this._output.Items[xx];
-
-      if (item[`${indexName}${hashKey}`].split(".").includes(collection)) {
+      if (item[`${indexName}${hashKey}`] === _collection) {
         ret = true;
         break;
       }
