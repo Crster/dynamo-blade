@@ -297,7 +297,7 @@ test("get exact result", async () => {
     .is("s1")
     .get();
 
-  expect(result.getResult().Count).toBe(1);
+  expect(result.getResult().Count).toBe(undefined);
 });
 
 test("transaction feature", async () => {

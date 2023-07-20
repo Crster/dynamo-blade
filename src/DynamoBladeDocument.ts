@@ -3,6 +3,7 @@ import {
   QueryCommand,
   DeleteCommand,
   UpdateCommand,
+  GetCommand,
 } from "@aws-sdk/lib-dynamodb";
 import DynamoBlade from "./DynamoBlade";
 import DynamoBladeCollection from "./DynamoBladeCollection";
@@ -143,24 +144,38 @@ export default class DynamoBladeDocument {
       }
     }
 
+    let useGet = false;
     if (pkey.sortKey.value && pkey.sortKey.value != pkey.hashKey.value) {
       if (filterCondition.length > 0) {
         keyConditions.push(`begins_with(${pkey.sortKey.name}, :sortKey)`);
       } else {
+        useGet = !pkey.useIndex;
         keyConditions.push(`${pkey.sortKey.name} = :sortKey`);
       }
       keyValues[":sortKey"] = pkey.sortKey.value;
     }
 
-    const command = new QueryCommand({
-      TableName: tableName,
-      KeyConditionExpression: keyConditions.join(" AND "),
-      FilterExpression: filterCondition.length
-        ? `${indexName}${hashKey} IN (${filterCondition.join(", ")})`
-        : undefined,
-      ExpressionAttributeValues: keyValues,
-      ExclusiveStartKey: decodeNext(next),
-    });
+    let command = null;
+    if (useGet) {
+      command = new GetCommand({
+        TableName: tableName,
+        ConsistentRead: true,
+        Key: {
+          [pkey.hashKey.name]: pkey.hashKey.value,
+          [pkey.sortKey.name]: pkey.sortKey.value,
+        },
+      });
+    } else {
+      command = new QueryCommand({
+        TableName: tableName,
+        KeyConditionExpression: keyConditions.join(" AND "),
+        FilterExpression: filterCondition.length
+          ? `${indexName}${hashKey} IN (${filterCondition.join(", ")})`
+          : undefined,
+        ExpressionAttributeValues: keyValues,
+        ExclusiveStartKey: decodeNext(next),
+      });
+    }
 
     const result = await docClient.send(command).catch((err) => err);
     return new GetResult(this.blade, result, pkey.collections, this.key);

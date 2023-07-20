@@ -1,16 +1,18 @@
-import { QueryCommandOutput } from "@aws-sdk/lib-dynamodb";
+import { GetCommandOutput, QueryCommandOutput } from "@aws-sdk/lib-dynamodb";
 import { encodeNext } from "./utils";
 import DynamoBlade from "./DynamoBlade";
 
 export default class GetResult {
   private _blade: DynamoBlade;
-  private _output: QueryCommandOutput;
+  private _output: GetCommandOutput | QueryCommandOutput;
   private _collections: Array<string>;
   private _key?: string;
+  private _isGet: boolean;
+  private _items: Array<Record<string, any>>;
 
   constructor(
     blade: DynamoBlade,
-    output: QueryCommandOutput,
+    output: GetCommandOutput | QueryCommandOutput,
     collections: Array<string>,
     key?: string
   ) {
@@ -18,6 +20,17 @@ export default class GetResult {
     this._output = output;
     this._collections = collections;
     this._key = key;
+    this._isGet = Object.keys(output).includes("Item");
+
+    if (this._isGet) {
+      if (output["Item"]) {
+        this._items = [output["Item"]];
+      } else {
+        this._items = [];
+      }
+    } else {
+      this._items = output["Items"];
+    }
   }
 
   hasItem(collection?: string) {
@@ -27,8 +40,8 @@ export default class GetResult {
       : this._collections.join(".");
     let ret: boolean = false;
 
-    for (let xx = 0; xx < this._output.Items.length; xx++) {
-      const item = this._output.Items[xx];
+    for (let xx = 0; xx < this._items.length; xx++) {
+      const item = this._items[xx];
       if (item[`${indexName}${hashKey}`] === _collection) {
         ret = true;
         break;
@@ -39,10 +52,12 @@ export default class GetResult {
   }
 
   getNext() {
-    return encodeNext(this._output.LastEvaluatedKey);
+    if (!this._isGet) {
+      return encodeNext(this._output["LastEvaluatedKey"]);
+    }
   }
 
-  getResult(): QueryCommandOutput {
+  getResult(): GetCommandOutput | QueryCommandOutput {
     return this._output;
   }
 
@@ -70,8 +85,8 @@ export default class GetResult {
     }
 
     if (_key) {
-      for (let xx = 0; xx < this._output.Items.length; xx++) {
-        const item = new Map(Object.entries(this._output.Items[xx]));
+      for (let xx = 0; xx < this._items.length; xx++) {
+        const item = new Map(Object.entries(this._items[xx]));
 
         const propertyName = item.get(`${indexName}${hashKey}`);
         const propertyKey = item.get(`${indexName}${sortKey}`);
@@ -104,8 +119,8 @@ export default class GetResult {
 
     let ret: Array<T> = [];
 
-    for (let xx = 0; xx < this._output.Items.length; xx++) {
-      const item = new Map(Object.entries(this._output.Items[xx]));
+    for (let xx = 0; xx < this._items.length; xx++) {
+      const item = new Map(Object.entries(this._items[xx]));
 
       const propertyName = item.get(`${indexName}${hashKey}`);
       const propertyKey = item.get(`${indexName}${sortKey}`);
