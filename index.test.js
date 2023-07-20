@@ -170,18 +170,6 @@ test("add song", async () => {
   expect(results).toStrictEqual([true, true, true, true, true, true, true]);
 });
 
-test("get all artist", async () => {
-  const results = await db.open("artist").get();
-
-  expect(results.getItems().length).toBe(3);
-});
-
-test("get all songs", async () => {
-  const results = await db.open("artist.album.song").get();
-
-  expect(results.getItems().length).toBe(7);
-});
-
 test("update value", async () => {
   const cmd = [
     db
@@ -222,6 +210,14 @@ test("remove", async () => {
       .is("001")
       .open("album")
       .is("ab001")
+      .open("song")
+      .is("s6")
+      .remove(),
+    db
+      .open("artist")
+      .is("001")
+      .open("album")
+      .is("ab001")
       .set({
         $delete: {
           awards: new Set(["VIP2"]),
@@ -231,7 +227,7 @@ test("remove", async () => {
   ];
 
   const results = await Promise.all(cmd);
-  expect(results).toStrictEqual([true, true]);
+  expect(results).toStrictEqual([true, true, true]);
 });
 
 test("get deleted album", async () => {
@@ -258,6 +254,18 @@ test("verify updated album", async () => {
   );
 });
 
+test("get all artist", async () => {
+  const results = await db.open("artist").get();
+
+  expect(results.getItems().length).toBe(3);
+});
+
+test("get all songs", async () => {
+  const results = await db.open("artist.album.song").get();
+
+  expect(results.getItems().length).toBe(7);
+});
+
 test("get album by field", async () => {
   const result = await db
     .open("artist")
@@ -272,9 +280,11 @@ test("get album by field", async () => {
     .is("ab")
     .get();
 
-  expect([result.getItems().length, result.getItems("song").length, result2.getItems().length]).toStrictEqual([
-    1, 3, 0,
-  ]);
+  expect([
+    result.getItems().length,
+    result.getItems("song").length,
+    result2.getItems().length,
+  ]).toStrictEqual([1, 3, 0]);
 });
 
 test("get exact result", async () => {
