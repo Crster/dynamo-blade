@@ -71,19 +71,19 @@ export default class GetResult {
 
     if (_key) {
       for (let xx = 0; xx < this._output.Items.length; xx++) {
-        const item = this._output.Items[xx];
+        const item = new Map(Object.entries(this._output.Items[xx]));
 
-        const propertyName = item[`${indexName}${hashKey}`];
-        const propertyKey = item[`${indexName}${sortKey}`];
+        const propertyName = item.get(`${indexName}${hashKey}`);
+        const propertyKey = item.get(`${indexName}${sortKey}`);
 
         if (propertyName === _collection && propertyKey === _key) {
-          delete item[`${indexName}${hashKey}`];
-          delete item[`${indexName}${sortKey}`];
-          delete item[sortKey];
+          item.delete(`${indexName}${hashKey}`);
+          item.delete(`${indexName}${sortKey}`);
+          item.delete(sortKey);
 
-          item[hashKey] = propertyKey;
+          item.set(hashKey, propertyKey);
 
-          ret = item as T;
+          ret = Object.fromEntries(item) as T;
           break;
         }
       }
@@ -94,25 +94,30 @@ export default class GetResult {
 
   getItems<T>(collection?: string): Array<T> {
     const { indexName, hashKey, sortKey } = this._blade.option;
-    const _collection = collection
-      ? [[...this._collections].splice(-1), collection].join(".")
-      : this._collections.join(".");
+
+    let _collection: string;
+    if (collection) {
+      _collection = [...this._collections, collection].join(".");
+    } else {
+      _collection = this._collections.join(".");
+    }
+
     let ret: Array<T> = [];
 
     for (let xx = 0; xx < this._output.Items.length; xx++) {
-      const item = this._output.Items[xx];
+      const item = new Map(Object.entries(this._output.Items[xx]));
 
-      const propertyName = item[`${indexName}${hashKey}`];
-      const propertyKey = item[`${indexName}${sortKey}`];
+      const propertyName = item.get(`${indexName}${hashKey}`);
+      const propertyKey = item.get(`${indexName}${sortKey}`);
 
       if (propertyName === _collection) {
-        delete item[`${indexName}${hashKey}`];
-        delete item[`${indexName}${sortKey}`];
-        delete item[sortKey];
+        item.delete(`${indexName}${hashKey}`);
+        item.delete(`${indexName}${sortKey}`);
+        item.delete(sortKey);
 
-        item[hashKey] = propertyKey;
+        item.set(hashKey, propertyKey);
 
-        ret.push(item as T);
+        ret.push(Object.fromEntries(item) as T);
       }
     }
 

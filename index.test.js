@@ -258,13 +258,13 @@ test("verify updated album", async () => {
   );
 });
 
-test("get albumn song", async () => {
+test("get album by field", async () => {
   const result = await db
     .open("artist")
     .is("001")
     .open("album")
     .is("ab001")
-    .get();
+    .get(["", "song"]);
   const result2 = await db
     .open("artist")
     .is("001")
@@ -272,7 +272,49 @@ test("get albumn song", async () => {
     .is("ab")
     .get();
 
-  expect([result.getItems().length, result2.getItems().length]).toStrictEqual([
-    1, 2,
+  expect([result.getItems().length, result.getItems("song").length, result2.getItems().length]).toStrictEqual([
+    1, 3, 0,
   ]);
+});
+
+test("get exact result", async () => {
+  const result = await db
+    .open("artist")
+    .is("001")
+    .open("album")
+    .is("ab001")
+    .open("song")
+    .is("s1")
+    .get();
+
+  expect(result.getResult().Count).toBe(1);
+});
+
+test("transaction feature", async () => {
+  await db
+    .open("artist")
+    .is("001")
+    .open("album")
+    .is("ab001")
+    .set({ songCount: 0 });
+
+  const artistAlbumnDb = db.open("artist").is("001").open("album").is("ab001");
+
+  const commands = [
+    artistAlbumnDb.open("song").is("s1").when("hasCollab", "=", true),
+    artistAlbumnDb.open("song").addLater("s6", {
+      title: "Song Number 6",
+      genre: "Reggae",
+      length: 4.5,
+      hasCollab: false,
+    }),
+    artistAlbumnDb.setLater({
+      songCount: 4,
+    }),
+  ];
+
+  await db.transact(commands);
+
+  const result = await artistAlbumnDb.get();
+  expect(result.getItem()).toHaveProperty("songCount", 4);
 });

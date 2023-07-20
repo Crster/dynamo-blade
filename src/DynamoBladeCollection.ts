@@ -41,14 +41,13 @@ export default class DynamoBladeCollection {
       ExclusiveStartKey: decodeNext(next),
     });
 
-    const result = await docClient.send(command);
+    const result = await docClient.send(command).catch((err) => err);
     return new GetResult(this.blade, result, pkey.collections);
   }
 
-  async add<T>(key: string, value: Partial<T>): Promise<boolean> {
-    const { client, tableName, separator, indexName, hashKey, sortKey } =
+  addLater<T>(key: string, value: Partial<T>) {
+    const { tableName, separator, indexName, hashKey, sortKey } =
       this.blade.option;
-    const docClient = DynamoDBDocumentClient.from(client);
 
     const pkey = buildKey(this.blade, [
       ...this.namespace,
@@ -66,26 +65,33 @@ export default class DynamoBladeCollection {
       },
     });
 
-    const result = await docClient.send(command);
+    return command;
+  }
+
+  async add<T>(key: string, value: Partial<T>): Promise<boolean> {
+    const docClient = DynamoDBDocumentClient.from(this.blade.option.client);
+    const command = this.addLater(key, value);
+
+    const result = await docClient.send(command).catch((err) => err);
     return result.$metadata.httpStatusCode === 200;
   }
 
-  async where<T>(
+  async where(
     field: string,
     condition: string,
-    value?: any,
+    value: any,
     next?: string
   ): Promise<GetResult> {
-    const { client, tableName, indexName } = this.blade.option;
-    const docClient = DynamoDBDocumentClient.from(client);
-
+    const { client, tableName, separator, indexName } = this.blade.option;
     const pkey = buildKey(this.blade, [...this.namespace, this.name]);
+    const docClient = DynamoDBDocumentClient.from(client);
 
     const filterCondition = [];
     const keyCondition = [`${pkey.hashKey.name} = :hashKey`];
     const keyValues = new Map();
     keyValues.set(":hashKey", pkey.hashKey.value);
 
+    let pk = null;
     const fieldNames = new Map();
     if (field === pkey.sortKey.name) {
       if (condition == "begins_with") {
@@ -93,7 +99,18 @@ export default class DynamoBladeCollection {
       } else {
         keyCondition.push(`${pkey.sortKey.name} ${condition} :sortKey`);
       }
-      keyValues.set(":sortKey", String(value));
+      if (pkey.useIndex) {
+        keyValues.set(":sortKey", String(value));
+      } else {
+        const skey = buildKey(this.blade, [
+          ...this.namespace,
+          this.name,
+          `${separator}${value}`,
+        ]);
+
+        pk = String(value);
+        keyValues.set(":sortKey", skey.sortKey.value);
+      }
     } else {
       if (!pkey.useIndex) {
         keyCondition.push(`begins_with(${pkey.sortKey.name}, :sortKey)`);
@@ -144,13 +161,14 @@ export default class DynamoBladeCollection {
       FilterExpression: filterCondition.length
         ? filterCondition.join(" AND ")
         : undefined,
-      ExpressionAttributeNames: Object.fromEntries(fieldNames),
+      ExpressionAttributeNames:
+        fieldNames.size > 0 ? Object.fromEntries(fieldNames) : undefined,
       ExpressionAttributeValues: Object.fromEntries(keyValues),
       ExclusiveStartKey: decodeNext(next),
       ScanIndexForward: !["<", ">", "<=", ">=", "between"].includes(condition),
     });
 
-    const result = await docClient.send(command);
-    return new GetResult(this.blade, result, pkey.collections);
+    const result = await docClient.send(command).catch((err) => err);
+    return new GetResult(this.blade, result, pkey.collections, pk);
   }
 }

@@ -61,3 +61,34 @@ const result = await db
     .is("love1")
     .set({ price: 210 });
 ```
+
+### To use transaction
+> for mutation only
+```js
+await db
+  .open("artist")
+  .is("001")
+  .open("album")
+  .is("ab001")
+  .set({ songCount: 0 });
+
+const artistAlbumnDb = db.open("artist").is("001").open("album").is("ab001");
+
+const commands = [
+  artistAlbumnDb.open("song").is("s1").when("hasCollab", "=", true),
+  artistAlbumnDb.open("song").addLater("s6", {
+    title: "Song Number 6",
+    genre: "Reggae",
+    length: 4.5,
+    hasCollab: false,
+  }),
+  artistAlbumnDb.setLater({
+    songCount: 4,
+  }),
+];
+
+await db.transact(commands); // use this to execute the transaction
+
+const result = await artistAlbumnDb.get();
+const success = result.getItem().songCount === 4 // the transaction succeed
+```
