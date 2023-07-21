@@ -297,9 +297,9 @@ test("get exact result", async () => {
     .is("ab001")
     .open("song")
     .is("s1")
-    .get();
+    .getItem()
 
-  expect(result.getResult().Count).toBe(undefined);
+  expect(result.PK).toBe("s1");
 });
 
 test("transaction feature", async () => {

@@ -15,11 +15,15 @@ export default class DynamoBladeDocument {
   private blade: DynamoBlade;
   private namespace: Array<string>;
   private key: string;
+  private _solid: boolean;
+  private _useGet: boolean;
 
   constructor(blade: DynamoBlade, namespace: Array<string>, key: string) {
     this.blade = blade;
     this.namespace = namespace;
     this.key = key;
+    this._solid = false;
+    this._useGet = false;
   }
 
   open(collection: string) {
@@ -107,6 +111,14 @@ export default class DynamoBladeDocument {
     return command;
   }
 
+  async getItem<T>(consistent?: boolean): Promise<T> {
+    this._solid = !!consistent;
+    this._useGet = true;
+
+    const result = await this.get();
+    return result.getItem<T>();
+  }
+
   async get(field?: Array<string>, next?: string): Promise<GetResult> {
     if (typeof field === "string") {
       next = field;
@@ -144,22 +156,20 @@ export default class DynamoBladeDocument {
       }
     }
 
-    let useGet = false;
     if (pkey.sortKey.value && pkey.sortKey.value != pkey.hashKey.value) {
       if (filterCondition.length > 0) {
         keyConditions.push(`begins_with(${pkey.sortKey.name}, :sortKey)`);
       } else {
-        useGet = !pkey.useIndex;
         keyConditions.push(`${pkey.sortKey.name} = :sortKey`);
       }
       keyValues[":sortKey"] = pkey.sortKey.value;
     }
 
     let command = null;
-    if (useGet) {
+    if (this._useGet) {
       command = new GetCommand({
         TableName: tableName,
-        ConsistentRead: false,
+        ConsistentRead: this._solid,
         Key: {
           [pkey.hashKey.name]: pkey.hashKey.value,
           [pkey.sortKey.name]: pkey.sortKey.value,
@@ -181,7 +191,7 @@ export default class DynamoBladeDocument {
     return new GetResult(this.blade, result, pkey.collections, this.key);
   }
 
-  setLater<T>(values: Partial<T>) {
+  setLater<T>(value: Partial<T>) {
     const { tableName, separator, indexName, hashKey, sortKey } =
       this.blade.option;
 
@@ -197,37 +207,37 @@ export default class DynamoBladeDocument {
     const propValues = [];
 
     const valuesWithGS = {
-      ...values,
+      ...value,
       [`${indexName}${hashKey}`]: pkey.collections.join("."),
       [`${indexName}${sortKey}`]: String(this.key),
-    };
+    } as any;
 
-    for (const prop in values) {
+    for (const prop in valuesWithGS) {
       switch (prop.toLowerCase()) {
         case "$set":
-          for (const prop2 in values[prop]) {
+          for (const prop2 in valuesWithGS[prop]) {
             setValues.push(
               `#prop${propValues.length} = :val${propValues.length}`
             );
             propValues.push({
               prop: prop2,
-              val: values[prop][prop2] != null ? values[prop][prop2] : "",
+              val: valuesWithGS[prop][prop2] != null ? valuesWithGS[prop][prop2] : "",
             });
           }
           break;
         case "$add":
-          for (const prop2 in values[prop]) {
+          for (const prop2 in valuesWithGS[prop]) {
             addValues.push(
               `#prop${propValues.length} :val${propValues.length}`
             );
             propValues.push({
               prop: prop2,
-              val: values[prop][prop2],
+              val: valuesWithGS[prop][prop2],
             });
           }
           break;
         case "$remove":
-          for (const prop2 in values[prop]) {
+          for (const prop2 in valuesWithGS[prop]) {
             remValues.push(`#prop${propValues.length}`);
             propValues.push({
               prop: prop2,
@@ -237,13 +247,13 @@ export default class DynamoBladeDocument {
           }
           break;
         case "$delete":
-          for (const prop2 in values[prop]) {
+          for (const prop2 in valuesWithGS[prop]) {
             delValues.push(
               `#prop${propValues.length} :val${propValues.length}`
             );
             propValues.push({
               prop: prop2,
-              val: values[prop][prop2],
+              val: valuesWithGS[prop][prop2],
             });
           }
           break;
@@ -253,7 +263,7 @@ export default class DynamoBladeDocument {
           );
           propValues.push({
             prop,
-            val: values[prop] != null ? values[prop] : "",
+            val: valuesWithGS[prop] != null ? valuesWithGS[prop] : "",
           });
           break;
       }
@@ -292,7 +302,7 @@ export default class DynamoBladeDocument {
         [pkey.hashKey.name]: pkey.hashKey.value,
         [pkey.sortKey.name]: pkey.sortKey.value,
       },
-      UpdateExpression: UpdateExpression.join(" "),
+      UpdateExpression: UpdateExpression.join("\n"),
       ExpressionAttributeNames,
       ExpressionAttributeValues:
         Object.keys(ExpressionAttributeValues).length > 0
