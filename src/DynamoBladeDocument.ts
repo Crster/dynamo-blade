@@ -182,7 +182,8 @@ export default class DynamoBladeDocument {
   }
 
   setLater<T>(values: Partial<T>) {
-    const { tableName, separator } = this.blade.option;
+    const { tableName, separator, indexName, hashKey, sortKey } =
+      this.blade.option;
 
     const pkey = buildKey(this.blade, [
       ...this.namespace,
@@ -194,6 +195,12 @@ export default class DynamoBladeDocument {
     const delValues = [];
     const remValues = [];
     const propValues = [];
+
+    const valuesWithGS = {
+      ...values,
+      [`${indexName}${hashKey}`]: pkey.collections.join("."),
+      [`${indexName}${sortKey}`]: String(this.key),
+    };
 
     for (const prop in values) {
       switch (prop.toLowerCase()) {
