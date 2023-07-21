@@ -181,6 +181,7 @@ test("update value", async () => {
         onsale: true,
         $add: {
           rating: -1,
+          rating2: 1,
         },
       }),
     db
@@ -195,6 +196,7 @@ test("update value", async () => {
         },
         $add: {
           rating: -1,
+          rating2: 2
         },
       }),
   ];

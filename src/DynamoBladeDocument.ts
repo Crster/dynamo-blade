@@ -159,7 +159,7 @@ export default class DynamoBladeDocument {
     if (useGet) {
       command = new GetCommand({
         TableName: tableName,
-        ConsistentRead: true,
+        ConsistentRead: false,
         Key: {
           [pkey.hashKey.name]: pkey.hashKey.value,
           [pkey.sortKey.name]: pkey.sortKey.value,
@@ -258,15 +258,15 @@ export default class DynamoBladeDocument {
     }
 
     if (addValues.length > 0) {
-      UpdateExpression.push(`ADD ${addValues.join(" ")}`);
+      UpdateExpression.push(`ADD ${addValues.join(",")}`);
     }
 
     if (delValues.length > 0) {
-      UpdateExpression.push(`DELETE ${delValues.join(" ")}`);
+      UpdateExpression.push(`DELETE ${delValues.join(",")}`);
     }
 
     if (remValues.length > 0) {
-      UpdateExpression.push(`REMOVE ${remValues.join(" ")}`);
+      UpdateExpression.push(`REMOVE ${remValues.join(",")}`);
     }
 
     let ExpressionAttributeValues = {};
