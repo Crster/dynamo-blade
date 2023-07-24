@@ -96,20 +96,49 @@ export default class DynamoBladeCollection {
     if (field === pkey.sortKey.name) {
       if (condition == "begins_with") {
         keyCondition.push(`begins_with(${pkey.sortKey.name}, :sortKey)`);
+      } else if (condition == "between") {
+        keyCondition.push(
+          `${pkey.sortKey.name} BETWEEN :sortKey01 AND :sortKey02`
+        );
+        if (!Array.isArray(value))
+          throw new Error("Value should be an array of two value");
       } else {
         keyCondition.push(`${pkey.sortKey.name} ${condition} :sortKey`);
       }
-      if (pkey.useIndex) {
-        keyValues.set(":sortKey", String(value));
-      } else {
-        const skey = buildKey(this.blade, [
-          ...this.namespace,
-          this.name,
-          `${separator}${value}`,
-        ]);
 
-        pk = String(value);
-        keyValues.set(":sortKey", skey.sortKey.value);
+      if (Array.isArray(value)) {
+        if (pkey.useIndex) {
+          keyValues.set(":sortKey01", String(value[0]));
+          keyValues.set(":sortKey02", String(value[1]));
+        } else {
+          const skey01 = buildKey(this.blade, [
+            ...this.namespace,
+            this.name,
+            `${separator}${value[0]}`,
+          ]);
+
+          const skey02 = buildKey(this.blade, [
+            ...this.namespace,
+            this.name,
+            `${separator}${value[1]}`,
+          ]);
+
+          keyValues.set(":sortKey01", skey01.sortKey.value);
+          keyValues.set(":sortKey02", skey02.sortKey.value);
+        }
+      } else {
+        if (pkey.useIndex) {
+          keyValues.set(":sortKey", String(value));
+        } else {
+          const skey = buildKey(this.blade, [
+            ...this.namespace,
+            this.name,
+            `${separator}${value}`,
+          ]);
+
+          pk = String(value);
+          keyValues.set(":sortKey", skey.sortKey.value);
+        }
       }
     } else {
       if (!pkey.useIndex) {
