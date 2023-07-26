@@ -62,7 +62,7 @@ export default class GetResult {
   }
 
   getItem<T>(collection?: string, key?: string): T {
-    const { indexName, hashKey, sortKey } = this._blade.option;
+    const { indexName, hashKey, sortKey, separator } = this._blade.option;
     let _collection: string,
       _key: string,
       ret: T = null;
@@ -89,7 +89,7 @@ export default class GetResult {
         const item = new Map(Object.entries(this._items[xx]));
 
         const propertyName = item.get(`${indexName}${hashKey}`);
-        const propertyKey = item.get(`${indexName}${sortKey}`);
+        const propertyKey = item.get(`${indexName}${sortKey}`)?.split(separator)?.pop();
 
         if (propertyName === _collection && propertyKey === _key) {
           item.delete(`${indexName}${hashKey}`);

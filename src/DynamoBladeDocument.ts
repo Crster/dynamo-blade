@@ -129,10 +129,11 @@ export default class DynamoBladeDocument {
       this.blade.option;
     const docClient = DynamoDBDocumentClient.from(client);
 
-    const pkey = buildKey(this.blade, [
-      ...this.namespace,
-      `${separator}${this.key}`,
-    ]);
+    const pkey = buildKey(this.blade, [...this.namespace, `${separator}${this.key}`]);
+    if (field?.length > 0) {
+      pkey.hashKey.value = pkey.hashKey.value + ":" + pkey.sortKey.value;
+      pkey.sortKey.value = "";
+    }
 
     const keyConditions = [];
     const keyValues = {};
@@ -209,7 +210,7 @@ export default class DynamoBladeDocument {
     const valuesWithGS = {
       ...value,
       [`${indexName}${hashKey}`]: pkey.collections.join("."),
-      [`${indexName}${sortKey}`]: String(this.key),
+      [`${indexName}${sortKey}`]: `${pkey.hashKey.value}:${pkey.sortKey.value}`,
     } as any;
 
     for (const prop in valuesWithGS) {
@@ -221,7 +222,10 @@ export default class DynamoBladeDocument {
             );
             propValues.push({
               prop: prop2,
-              val: valuesWithGS[prop][prop2] != null ? valuesWithGS[prop][prop2] : "",
+              val:
+                valuesWithGS[prop][prop2] != null
+                  ? valuesWithGS[prop][prop2]
+                  : "",
             });
           }
           break;

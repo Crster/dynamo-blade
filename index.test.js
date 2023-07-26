@@ -196,7 +196,7 @@ test("update value", async () => {
         },
         $add: {
           rating: -1,
-          rating2: 2
+          rating2: 2,
         },
       }),
   ];
@@ -274,7 +274,7 @@ test("get album by field", async () => {
     .is("001")
     .open("album")
     .is("ab001")
-    .get(["", "song"]);
+    .get(["song"]);
   const result2 = await db
     .open("artist")
     .is("001")
@@ -283,10 +283,9 @@ test("get album by field", async () => {
     .get();
 
   expect([
-    result.getItems().length,
     result.getItems("song").length,
     result2.getItems().length,
-  ]).toStrictEqual([1, 3, 0]);
+  ]).toStrictEqual([3, 0]);
 });
 
 test("get exact result", async () => {
@@ -297,7 +296,7 @@ test("get exact result", async () => {
     .is("ab001")
     .open("song")
     .is("s1")
-    .getItem()
+    .getItem();
 
   expect(result.PK).toBe("s1");
 });
@@ -330,3 +329,9 @@ test("transaction feature", async () => {
   const result = await artistAlbumnDb.get();
   expect(result.getItem()).toHaveProperty("songCount", 4);
 });
+
+test("filter on index", async () => {
+  const result = await db.open("artist.album.song").where("GS1SK", "=", "artist#001:album#ab001:song#s2")
+
+  expect(result.getItem()).toHaveProperty("genre", "Rock")
+})

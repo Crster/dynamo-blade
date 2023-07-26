@@ -61,7 +61,7 @@ export default class DynamoBladeCollection {
         [pkey.hashKey.name]: pkey.hashKey.value,
         [pkey.sortKey.name]: pkey.sortKey.value,
         [`${indexName}${hashKey}`]: pkey.collections.join("."),
-        [`${indexName}${sortKey}`]: String(key),
+        [`${indexName}${sortKey}`]: `${pkey.hashKey.value}:${pkey.sortKey.value}`,
       },
     });
 
@@ -108,8 +108,8 @@ export default class DynamoBladeCollection {
 
       if (Array.isArray(value)) {
         if (pkey.useIndex) {
-          keyValues.set(":sortKey01", String(value[0]));
-          keyValues.set(":sortKey02", String(value[1]));
+          keyValues.set(":sortKey01", value[0]);
+          keyValues.set(":sortKey02", value[1]);
         } else {
           const skey01 = buildKey(this.blade, [
             ...this.namespace,
@@ -128,17 +128,17 @@ export default class DynamoBladeCollection {
         }
       } else {
         if (pkey.useIndex) {
-          keyValues.set(":sortKey", String(value));
+          keyValues.set(":sortKey", value);
         } else {
           const skey = buildKey(this.blade, [
             ...this.namespace,
             this.name,
             `${separator}${value}`,
           ]);
-
-          pk = String(value);
           keyValues.set(":sortKey", skey.sortKey.value);
         }
+
+        pk = value?.split(separator)?.pop();
       }
     } else {
       if (!pkey.useIndex) {

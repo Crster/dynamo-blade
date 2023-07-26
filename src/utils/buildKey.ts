@@ -1,9 +1,6 @@
 import DynamoBlade from "../DynamoBlade";
 
-export default function buildKey(
-  blade: DynamoBlade,
-  namespace: Array<string>,
-) {
+export default function buildKey(blade: DynamoBlade, namespace: Array<string>) {
   const ret = {
     useIndex: false,
     keys: [],
@@ -31,24 +28,33 @@ export default function buildKey(
     }
   }
 
-  for (let index = 0; index < groupKey.length; index++) {
-    const element = groupKey[index];
-
-    if (ret.sortKey.value) {
-      ret.sortKey.value += `:${element.collection}${element.key}`;
-    } else if (ret.hashKey.value) {
-      ret.sortKey.value = `${element.collection}${element.key}`;
-    } else {
-      ret.hashKey.value = `${element.collection}${element.key}`;
-    }
-  }
-
-  if (ret.collections.length === 1 && ret.keys.length === 1) {
-    ret.sortKey.value = ret.hashKey.value
-  } else if (ret.keys.length === 0) {
-    ret.hashKey.name = `${blade.option.indexName}${blade.option.hashKey}`
-    ret.sortKey.name = `${blade.option.indexName}${blade.option.hashKey}`
+  if (
+    groupKey.length == 1 &&
+    groupKey[0].collection &&
+    groupKey[0].key === ""
+  ) {
     ret.useIndex = true;
+    ret.hashKey.name = `${blade.option.indexName}${blade.option.hashKey}`;
+    ret.sortKey.name = `${blade.option.indexName}${blade.option.sortKey}`;
+
+    ret.hashKey.value = ret.collections.join(".");
+    ret.sortKey.value = groupKey
+      .map((ii) => `${ii.collection}${ii.key}`)
+      .join(":");
+  } else {
+    if (groupKey.length > 1) {
+      ret.sortKey.value = [groupKey.pop()]
+        .map((ii) => `${ii.collection}${ii.key}`)
+        .join();
+    } else {
+      ret.sortKey.value = groupKey
+        .map((ii) => `${ii.collection}${ii.key}`)
+        .join(":");
+    }
+
+    ret.hashKey.value = groupKey
+      .map((ii) => `${ii.collection}${ii.key}`)
+      .join(":");
   }
 
   return ret;
