@@ -27,7 +27,7 @@ export default class DynamoBlade<Schema> {
   }
 
   open<T>(collection: T extends Model<Schema> ? T : Model<Schema>) {
-    return new BladeCollection(this.option.openCollection(collection));
+    return new BladeCollection<Schema[typeof collection]>(this.option.openCollection(collection));
   }
 
   async init(billingMode: BillingMode = "PAY_PER_REQUEST") {

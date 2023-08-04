@@ -8,7 +8,7 @@ import {
 import { decodeNext, buildItems, encodeNext } from "./utils/index";
 import BladeOption from "./BladeOption";
 import BladeDocument from "./BladeDocument";
-import { FilterCondition } from "./BladeType";
+import { FilterCondition, Model } from "./BladeType";
 
 export default class BladeCollection<Schema> {
   private option: BladeOption;
@@ -96,8 +96,8 @@ export default class BladeCollection<Schema> {
     }
   }
 
-  async where(
-    field: string,
+  async where<T>(
+    field: T extends Model<Schema> ? T : Model<Schema>,
     condition: FilterCondition,
     value: any,
     next?: string
@@ -146,38 +146,38 @@ export default class BladeCollection<Schema> {
     switch (condition) {
       case "=":
         filterCondition.push(`#field = :value`);
-        expressionAttributeNames.set("#field", field);
+        expressionAttributeNames.set("#field", field as string);
         expressionAttributeValues.set(":value", value);
         break;
       case "!=":
         filterCondition.push(`#field <> :value`);
-        expressionAttributeNames.set("#field", field);
+        expressionAttributeNames.set("#field", field as string);
         expressionAttributeValues.set(":value", value);
         break;
       case "<":
         filterCondition.push(`#field < :value`);
-        expressionAttributeNames.set("#field", field);
+        expressionAttributeNames.set("#field", String(field));
         expressionAttributeValues.set(":value", value);
         break;
       case "<=":
         filterCondition.push(`#field <= :value`);
-        expressionAttributeNames.set("#field", field);
+        expressionAttributeNames.set("#field", String(field));
         expressionAttributeValues.set(":value", value);
         break;
       case ">":
         filterCondition.push(`#field > :value`);
-        expressionAttributeNames.set("#field", field);
+        expressionAttributeNames.set("#field", String(field));
         expressionAttributeValues.set(":value", value);
         break;
       case ">=":
         filterCondition.push(`#field >= :value`);
-        expressionAttributeNames.set("#field", field);
+        expressionAttributeNames.set("#field", String(field));
         expressionAttributeValues.set(":value", value);
         break;
       case "BETWEEN":
         if (Array.isArray(value) && value.length === 2) {
           filterCondition.push(`#field BETWEEN :valueFrom AND :valueTo`);
-          expressionAttributeNames.set("#field", field);
+          expressionAttributeNames.set("#field", String(field));
           expressionAttributeValues.set(":valueFrom", value.at(0));
           expressionAttributeValues.set(":valueTo", value.at(1));
         }
@@ -191,12 +191,12 @@ export default class BladeCollection<Schema> {
           });
 
           filterCondition.push(`#field IN (${values.join(",")})`);
-          expressionAttributeNames.set("#field", field);
+          expressionAttributeNames.set("#field", String(field));
         }
         break;
       case "BEGINS_WITH":
         filterCondition.push(`begins_with(#field, :value)`);
-        expressionAttributeNames.set("#field", field);
+        expressionAttributeNames.set("#field", String(field));
         expressionAttributeValues.set(":value", value);
         break;
     }

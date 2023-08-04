@@ -34,9 +34,13 @@ export type FilterCondition =
 
 export type QueryResult<T> = { items: Array<T>; next?: string };
 
+export type RemoveValue<T> = {
+  [P in keyof T]?: boolean
+}
+
 export type UpdateValue<T> =
   | Partial<T>
   | { $add: Partial<T> }
   | { $set: Partial<T> }
-  | { $remove: Partial<T> }
+  | { $remove: RemoveValue<T> }
   | { $delete: Partial<T> };
