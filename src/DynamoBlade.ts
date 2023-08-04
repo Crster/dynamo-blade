@@ -1,8 +1,7 @@
 import {
+  BillingMode,
   ConditionCheck,
   CreateTableCommand,
-  DynamoDBClient,
-  TransactWriteItem,
 } from "@aws-sdk/client-dynamodb";
 import {
   DeleteCommand,
@@ -10,89 +9,72 @@ import {
   PutCommand,
   UpdateCommand,
   TransactWriteCommand,
-  GetCommand,
   TransactWriteCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 
-import DynamoBladeCollection from "./DynamoBladeCollection";
+import { Option, Model } from "./BladeType";
+import BladeOption from "./BladeOption";
+import BladeCollection from "./BladeCollection";
 
-type Option = {
-  tableName: string;
-  client: DynamoDBClient;
-  hashKey?: string;
-  sortKey?: string;
-  indexName?: string;
-  separator?: string;
-};
-
-export default class DynamoBlade {
-  public option: Option;
+export default class DynamoBlade<Schema> {
+  public option: BladeOption;
 
   constructor(option: Option) {
     if (!option) throw new Error("Option is required");
     if (!option.tableName) throw new Error("option.tableName is required");
     if (!option.client) throw new Error("option.client is required");
 
-    this.option = {
-      tableName: option.tableName,
-      client: option.client,
-      hashKey: option.hashKey || "PK",
-      sortKey: option.sortKey || "SK",
-      indexName: option.indexName || "GS1",
-      separator: option.separator || "#",
-    };
+    this.option = new BladeOption(option);
   }
 
-  open(collection: string) {
-    return new DynamoBladeCollection(this, [], collection);
+  open<T>(collection: T extends Model<Schema> ? T : Model<Schema>) {
+    return new BladeCollection(this.option.openCollection(collection));
   }
 
-  async init(
-    billingMode: "PROVISIONED" | "PAY_PER_REQUEST" = "PAY_PER_REQUEST"
-  ) {
-    const { client, tableName, hashKey, sortKey, indexName } = this.option;
+  async init(billingMode: BillingMode = "PAY_PER_REQUEST") {
+    const { client, tableName, getFieldName, getFieldValue } = this.option;
     const docClient = DynamoDBDocumentClient.from(client);
 
     const command = new CreateTableCommand({
       TableName: tableName,
       KeySchema: [
         {
-          AttributeName: hashKey,
+          AttributeName: getFieldName("HASH"),
           KeyType: "HASH",
         },
         {
-          AttributeName: sortKey,
+          AttributeName: getFieldName("SORT"),
           KeyType: "RANGE",
         },
       ],
       AttributeDefinitions: [
         {
-          AttributeName: hashKey,
+          AttributeName: getFieldName("HASH"),
           AttributeType: "S",
         },
         {
-          AttributeName: sortKey,
+          AttributeName: getFieldName("SORT"),
           AttributeType: "S",
         },
         {
-          AttributeName: `${indexName}${hashKey}`,
+          AttributeName: getFieldName("HASH_INDEX"),
           AttributeType: "S",
         },
         {
-          AttributeName: `${indexName}${sortKey}`,
+          AttributeName: getFieldName("SORT_INDEX"),
           AttributeType: "S",
         },
       ],
       GlobalSecondaryIndexes: [
         {
-          IndexName: indexName,
+          IndexName: getFieldName("INDEX"),
           KeySchema: [
             {
-              AttributeName: `${indexName}${hashKey}`,
+              AttributeName: getFieldName("HASH_INDEX"),
               KeyType: "HASH",
             },
             {
-              AttributeName: `${indexName}${sortKey}`,
+              AttributeName: getFieldName("SORT_INDEX"),
               KeyType: "RANGE",
             },
           ],
@@ -110,6 +92,8 @@ export default class DynamoBlade {
     } catch (err) {
       if (err.name === "ResourceInUseException") {
         return true;
+      } else {
+        console.warn(`Failed to initialize ${tableName} (${err.message})`);
       }
 
       return false;
@@ -117,7 +101,7 @@ export default class DynamoBlade {
   }
 
   async transact(
-    commands: Array<PutCommand | UpdateCommand | DeleteCommand | ConditionCheck>
+    commands: Array<PutCommand | UpdateCommand | DeleteCommand>
   ) {
     const input: TransactWriteCommandInput = {
       ClientRequestToken: Date.now().toString(),
@@ -156,35 +140,24 @@ export default class DynamoBlade {
             ExpressionAttributeValues: command.input.ExpressionAttributeValues,
           },
         });
-      } else if (command["Key"] && command["ConditionExpression"]) {
-        const { hashKey, sortKey } = this.option;
-
-        input.TransactItems.push({
-          ConditionCheck: {
-            Key: {
-              [hashKey]: command.Key[hashKey].S,
-              [sortKey]: command.Key[sortKey].S,
-            },
-            TableName: command.TableName,
-            ConditionExpression: command.ConditionExpression,
-            ExpressionAttributeNames: command.ExpressionAttributeNames,
-            ExpressionAttributeValues: command.ExpressionAttributeValues,
-            ReturnValuesOnConditionCheckFailure:
-              command.ReturnValuesOnConditionCheckFailure,
-          },
-        });
       }
     }
 
     if (input.TransactItems.length > 0) {
       const transaction = new TransactWriteCommand(input);
-
       const docClient = DynamoDBDocumentClient.from(this.option.client);
 
-      const result = await docClient.send(transaction).catch((err) => err);
-      return result.$metadata.httpStatusCode === 200;
+      try {
+        const result = await docClient.send(transaction);
+        return result.$metadata.httpStatusCode === 200;
+      } catch (err) {
+        console.warn(
+          `Failed to transact ${input.TransactItems.length} items (${err.message})`
+        );
+        return false;
+      }
     } else {
-      return false;
+      return true;
     }
   }
 }
