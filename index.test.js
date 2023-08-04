@@ -44,7 +44,8 @@ test("get artist by key", async () => {
   expect(result1).toBe(null);
 
   const result2 = await db.open("artist").is("akon").get();
-  expect(result2).toHaveProperty("PK", "artist#akon");
+  expect(result2).toHaveProperty("PK", "akon");
+  expect(result2).toHaveProperty("SK", "artist#akon");
 });
 
 test("update artist age", async () => {
