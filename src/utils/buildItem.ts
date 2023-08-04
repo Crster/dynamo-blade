@@ -9,15 +9,9 @@ export default function buildItem<T>(
 
     for (const key in value) {
       if (key === option.getFieldName("HASH")) {
-        ret.set(
-          option.getFieldName("SORT"),
-          option.getFieldValue("PRIMARY_KEY")
-        );
+        ret.set(key, value[option.getFieldName("SORT_INDEX")]);
       } else if (key === option.getFieldName("SORT")) {
-        ret.set(
-          option.getFieldName("HASH"),
-          value.split(option.separator).pop()
-        );
+        // Not implemented
       } else if (key === option.getFieldName("HASH_INDEX")) {
         // Not implemented
       } else if (key === option.getFieldName("SORT_INDEX")) {

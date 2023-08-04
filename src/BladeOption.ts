@@ -16,14 +16,18 @@ export default class BladeOption {
   constructor(option: Option) {
     this.client = option.client;
     this.tableName = option.tableName;
-    this.hashKey = option.hashKey;
-    this.sortKey = option.sortKey;
-    this.indexName = option.indexName;
-    this.separator = option.separator;
+    this.hashKey = option.hashKey || "PK";
+    this.sortKey = option.sortKey || "SK";
+    this.indexName = option.indexName || "GS1";
+    this.separator = option.separator || "#";
     this.namespace = new Map();
   }
 
-  getFieldName(type: FieldType) {
+  isUseIndex = () => {
+    return (this.namespace.size === 1 && !this.key)
+  }
+
+  getFieldName = (type: FieldType) => {
     switch (type) {
       case "HASH":
         return this.hashKey;
@@ -38,22 +42,30 @@ export default class BladeOption {
       case "PRIMARY_KEY":
         return this.hashKey;
       default:
-        return ""
+        return "";
     }
-  }
+  };
 
-  getFieldValue(type: FieldType) {
-    let index = 0;
+  getFieldValue = (type: FieldType) => {
+    let counter = 1;
     const ret: Array<string> = [];
 
     switch (type) {
-      case "HASH":
+      case "HASH": // Get Right
+        if (this.namespace.size <= 1) {
+          counter--;
+        }
+
         for (const [key, value] of this.namespace.entries()) {
-          if (index < this.namespace.size) {
-            ret.push(`${key}${this.separator}${value}`);
+          if (counter < this.namespace.size) {
+            if (value) {
+              ret.push(`${key}${this.separator}${value}`);
+            } else {
+              ret.push(key);
+            }
           }
 
-          index++;
+          counter++;
         }
         break;
       case "HASH_INDEX":
@@ -61,37 +73,57 @@ export default class BladeOption {
           ret.push(key);
         }
         break;
-      case "SORT":
+      case "SORT": // Get Last
+        if (this.namespace.size <= 1) {
+          counter++;
+        }
+
         for (const [key, value] of this.namespace.entries()) {
-          if (index >= this.namespace.size) {
-            ret.push(`${key}${this.separator}${value}`);
+          if (counter >= this.namespace.size) {
+            if (value) {
+              ret.push(`${key}${this.separator}${value}`);
+            } else {
+              ret.push(`${key}${this.separator}`);
+            }
           }
 
-          index++;
+          counter++;
         }
         break;
-      case "SORT_INDEX":
+      case "SORT_INDEX": // Get First and Last
         for (const [key, value] of this.namespace.entries()) {
-          if (index == 0) {
-            ret.push(`${key}${this.separator}${value}`);
-          } else if (index >= this.namespace.size) {
-            ret.push(`${key}${this.separator}${value}`);
+          if (counter == 1) {
+            if (value) {
+              ret.push(`${key}${this.separator}${value}`);
+            } else {
+              ret.push(`${key}${this.separator}`);
+            }
+          } else if (counter >= this.namespace.size) {
+            if (value) {
+              ret.push(`${key}${this.separator}${value}`);
+            } else {
+              ret.push(`${key}${this.separator}`);
+            }
           }
 
-          index++;
+          counter++;
         }
         break;
       case "PRIMARY_KEY":
         for (const [key, value] of this.namespace.entries()) {
-          ret.push(`${key}${this.separator}${value}`);
+          if (value) {
+            ret.push(`${key}${this.separator}${value}`);
+          } else {
+            ret.push(key);
+          }
         }
         break;
     }
 
     return ret.join(":");
-  }
+  };
 
-  openCollection(name: any) {
+  openCollection = (name: any) => {
     const ret = new BladeOption({
       client: this.client,
       tableName: this.tableName,
@@ -100,14 +132,18 @@ export default class BladeOption {
       indexName: this.indexName,
       separator: this.separator,
     });
+
+    for (const [key, val] of this.namespace.entries()) {
+      ret.namespace.set(key, val);
+    }
 
     ret.collection = name;
     ret.namespace.set(name, null);
 
     return ret;
-  }
+  };
 
-  openKey(key: any) {
+  openKey = (key: any) => {
     const ret = new BladeOption({
       client: this.client,
       tableName: this.tableName,
@@ -116,11 +152,15 @@ export default class BladeOption {
       indexName: this.indexName,
       separator: this.separator,
     });
+
+    for (const [key, val] of this.namespace.entries()) {
+      ret.namespace.set(key, val);
+    }
 
     ret.key = key;
     ret.collection = this.collection;
     ret.namespace.set(this.collection, key);
 
     return ret;
-  }
+  };
 }

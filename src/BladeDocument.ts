@@ -4,10 +4,11 @@ import {
   UpdateCommand,
   GetCommand,
 } from "@aws-sdk/lib-dynamodb";
+
 import { buildItem } from "./utils";
-import BladeCollection from "./BladeCollection";
 import BladeOption from "./BladeOption";
-import { Model } from "./BladeType";
+import BladeCollection from "./BladeCollection";
+import { Model, UpdateValue } from "./BladeType";
 
 export default class BladeDocument<Schema> {
   private option: BladeOption;
@@ -51,7 +52,7 @@ export default class BladeDocument<Schema> {
     }
   }
 
-  setLater<T>(value: Partial<T>) {
+  setLater(value: UpdateValue<Schema>) {
     const { tableName, getFieldName, getFieldValue } = this.option;
 
     const updateExpression: Array<string> = [];
@@ -68,7 +69,7 @@ export default class BladeDocument<Schema> {
             expressionAttributeName.set(`#prop${field.counter}`, subProp);
             expressionAttributeValues.set(
               `:value${field.counter}`,
-              setProps[subProp]
+              setProps[subProp] != null ? setProps[subProp] : ""
             );
             field.counter += 1;
           }
@@ -76,7 +77,7 @@ export default class BladeDocument<Schema> {
         case "$add":
           const addProps = value[prop];
           for (const subProp in addProps) {
-            field.add.push(`#prop${field.counter} = :value${field.counter}`);
+            field.add.push(`#prop${field.counter} :value${field.counter}`);
             expressionAttributeName.set(`#prop${field.counter}`, subProp);
             expressionAttributeValues.set(
               `:value${field.counter}`,
@@ -88,19 +89,21 @@ export default class BladeDocument<Schema> {
         case "$remove":
           const removeProps = value[prop];
           for (const subProp in removeProps) {
-            field.remove.push(`#prop${field.counter} = :value${field.counter}`);
-            expressionAttributeName.set(`#prop${field.counter}`, subProp);
-            expressionAttributeValues.set(
-              `:value${field.counter}`,
-              removeProps[subProp]
-            );
+            if (removeProps[subProp]) {
+              field.remove.push(`#prop${field.counter}`);
+              expressionAttributeName.set(`#prop${field.counter}`, subProp);
+            } else {
+              field.set.push(`#prop${field.counter} = :value${field.counter}`);
+              expressionAttributeName.set(`#prop${field.counter}`, subProp);
+              expressionAttributeValues.set(`:value${field.counter}`, "");
+            }
             field.counter += 1;
           }
           break;
         case "$delete":
           const deleteProps = value[prop];
           for (const subProp in deleteProps) {
-            field.delete.push(`#prop${field.counter} = :value${field.counter}`);
+            field.delete.push(`#prop${field.counter} :value${field.counter}`);
             expressionAttributeName.set(`#prop${field.counter}`, subProp);
             expressionAttributeValues.set(
               `:value${field.counter}`,
@@ -112,10 +115,27 @@ export default class BladeDocument<Schema> {
         default:
           field.set.push(`#prop${field.counter} = :value${field.counter}`);
           expressionAttributeName.set(`#prop${field.counter}`, prop);
-          expressionAttributeValues.set(`:value${field.counter}`, value[prop]);
+          expressionAttributeValues.set(
+            `:value${field.counter}`,
+            value[prop] != null ? value[prop] : ""
+          );
           field.counter += 1;
           break;
       }
+    }
+
+    // Populate item keys
+    const keyValue = {
+      [getFieldName("HASH_INDEX")]: getFieldValue("HASH_INDEX"),
+      [getFieldName("SORT_INDEX")]: getFieldValue("SORT_INDEX"),
+    };
+
+    for (const prop in keyValue) {
+      field.set.push(`#prop${field.counter} = :value${field.counter}`);
+      expressionAttributeName.set(`#prop${field.counter}`, prop);
+      expressionAttributeValues.set(`:value${field.counter}`, keyValue[prop]);
+      field.counter += 1;
+      break;
     }
 
     // Populate Update Expression
@@ -146,7 +166,7 @@ export default class BladeDocument<Schema> {
     return command;
   }
 
-  async set<T>(values: Partial<T>) {
+  async set(values: UpdateValue<Schema>) {
     const docClient = DynamoDBDocumentClient.from(this.option.client);
     const command = this.setLater(values);
 

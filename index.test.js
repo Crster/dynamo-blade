@@ -9,333 +9,208 @@ const db = new DynamoBlade({
   }),
 });
 
-// test("test init", async () => {
-//   const result = await db.init();
-//   expect(result).toBe(true);
-// });
-
-// test("add artist", async () => {
-//   const cmd = [
-//     db.open("artist").add("001", {
-//       name: "Artist 1",
-//       age: 30,
-//     }),
-//     db.open("artist").add("002", {
-//       name: "Artist 2",
-//       age: 23,
-//     }),
-//     db.open("artist").add("003", {
-//       name: "Artist 3",
-//       age: 25,
-//     }),
-//   ];
-
-//   const results = await Promise.all(cmd);
-//   expect(results).toStrictEqual([true, true, true]);
-// });
-
-// test("add album", async () => {
-//   const cmd = [
-//     db.open("artist").is("001").open("album").add("ab001", {
-//       title: "Album 001",
-//       rating: 5,
-//     }),
-//     db.open("artist").is("001").open("album").add("ab002", {
-//       title: "Album 002",
-//       rating: 5,
-//     }),
-//     db.open("artist").is("001").open("album").add("ab003", {
-//       title: "Album 003",
-//       rating: 3,
-//     }),
-//     db.open("artist").is("002").open("album").add("ab001", {
-//       title: "Album 001",
-//       rating: 4,
-//     }),
-//     db.open("artist").is("002").open("album").add("ab002", {
-//       title: "Album 002",
-//       rating: 3,
-//     }),
-//     db.open("artist").is("002").open("album").add("ab003", {
-//       title: "Album 003",
-//       rating: 5,
-//     }),
-//     db.open("artist").is("003").open("album").add("ab001", {
-//       title: "Album 001",
-//       rating: 3,
-//     }),
-//   ];
-
-//   const results = await Promise.all(cmd);
-//   expect(results).toStrictEqual([true, true, true, true, true, true, true]);
-// });
-
-// test("add song", async () => {
-//   const cmd = [
-//     db
-//       .open("artist")
-//       .is("001")
-//       .open("album")
-//       .is("ab001")
-//       .open("song")
-//       .add("s1", {
-//         title: "Song Number 1",
-//         genre: "Rock",
-//         length: 5,
-//         hasCollab: true,
-//       }),
-//     db
-//       .open("artist")
-//       .is("001")
-//       .open("album")
-//       .is("ab001")
-//       .open("song")
-//       .add("s2", {
-//         title: "Song Number 2",
-//         genre: "Rock",
-//         length: 4.5,
-//         hasCollab: false,
-//       }),
-//     db
-//       .open("artist")
-//       .is("001")
-//       .open("album")
-//       .is("ab001")
-//       .open("song")
-//       .add("s3", {
-//         title: "Song Number 3",
-//         genre: "Alternatives",
-//         length: 4.5,
-//         hasCollab: false,
-//       }),
-//     db
-//       .open("artist")
-//       .is("001")
-//       .open("album")
-//       .is("ab002")
-//       .open("song")
-//       .add("s4", {
-//         title: "Song Number 4",
-//         genre: "Alternatives",
-//         length: 3,
-//         hasCollab: false,
-//       }),
-//     db
-//       .open("artist")
-//       .is("001")
-//       .open("album")
-//       .is("ab002")
-//       .open("song")
-//       .add("s5", {
-//         title: "Song Number 5",
-//         genre: "Rock",
-//         length: 3,
-//         hasCollab: false,
-//       }),
-//     db
-//       .open("artist")
-//       .is("003")
-//       .open("album")
-//       .is("ab001")
-//       .open("song")
-//       .add("s1", {
-//         title: "Song #1",
-//         genre: "Pop",
-//         length: 5,
-//         hasCollab: true,
-//         collabs: [
-//           db.open("artist").is("002").toString(),
-//           db.open("artist").is("001").toString(),
-//         ],
-//       }),
-//     db
-//       .open("artist")
-//       .is("003")
-//       .open("album")
-//       .is("ab001")
-//       .open("song")
-//       .add("s2", {
-//         title: "Song #2",
-//         genre: "Rock",
-//         length: 5,
-//         hasCollab: true,
-//         collabs: [
-//           db.open("artist").is("002").toString(),
-//           db.open("artist").is("001").toString(),
-//         ],
-//       }),
-//   ];
-
-//   const results = await Promise.all(cmd);
-//   expect(results).toStrictEqual([true, true, true, true, true, true, true]);
-// });
-
-// test("update value", async () => {
-//   const cmd = [
-//     db
-//       .open("artist")
-//       .is("001")
-//       .open("album")
-//       .is("ab001")
-//       .set({
-//         onsale: true,
-//         $add: {
-//           rating: -1,
-//           rating2: 1,
-//         },
-//       }),
-//     db
-//       .open("artist")
-//       .is("001")
-//       .open("album")
-//       .is("ab001")
-//       .set({
-//         $set: {
-//           awards: new Set(["VIP1", "VIP2", "ROCK1"]),
-//           release: new Date().toISOString(),
-//         },
-//         $add: {
-//           rating: -1,
-//           rating2: 2,
-//         },
-//       }),
-//   ];
-
-//   const results = await Promise.all(cmd);
-//   expect(results).toStrictEqual([true, true]);
-// });
-
-// test("remove", async () => {
-//   const cmd = [
-//     db
-//       .open("artist")
-//       .is("001")
-//       .open("album")
-//       .is("ab001")
-//       .open("song")
-//       .is("s6")
-//       .remove(),
-//     db
-//       .open("artist")
-//       .is("001")
-//       .open("album")
-//       .is("ab001")
-//       .set({
-//         $delete: {
-//           awards: new Set(["VIP2"]),
-//         },
-//       }),
-//     db.open("artist").is("001").open("album").is("ab003").remove(),
-//   ];
-
-//   const results = await Promise.all(cmd);
-//   expect(results).toStrictEqual([true, true, true]);
-// });
-
-// test("get deleted album", async () => {
-//   const result = await db
-//     .open("artist")
-//     .is("001")
-//     .open("album")
-//     .is("ab003")
-//     .get();
-
-//   expect(result.hasItem()).toBe(false);
-// });
-
-// test("verify updated album", async () => {
-//   const result = await db
-//     .open("artist")
-//     .is("001")
-//     .open("album")
-//     .where("onsale", "=", true);
-
-//   expect(result.getItems().at(0)).toHaveProperty(
-//     "awards",
-//     new Set(["ROCK1", "VIP1"])
-//   );
-// });
-
-// test("get all artist", async () => {
-//   const results = await db.open("artist").get();
-
-//   expect(results.getItems().length).toBe(3);
-// });
-
-// test("get all songs", async () => {
-//   const results = await db.open("artist.album.song").get();
-
-//   expect(results.getItems().length).toBe(7);
-// });
-
-// test("get album by field", async () => {
-//   const result = await db
-//     .open("artist")
-//     .is("001")
-//     .open("album")
-//     .is("ab001")
-//     .get(["song"]);
-//   const result2 = await db
-//     .open("artist")
-//     .is("001")
-//     .open("album")
-//     .is("ab")
-//     .get();
-
-//   expect([
-//     result.getItems("song").length,
-//     result2.getItems().length,
-//   ]).toStrictEqual([3, 0]);
-// });
-
-// test("get exact result", async () => {
-//   const result = await db
-//     .open("artist")
-//     .is("001")
-//     .open("album")
-//     .is("ab001")
-//     .open("song")
-//     .is("s1")
-//     .getItem();
-
-//   expect(result.PK).toBe("s1");
-// });
-
-test("transaction feature", async () => {
-  await db
-    .open("artist")
-    .is("001")
-    .open("album")
-    .is("ab001")
-    .open("song")
-    .is("power")
-    .open("asdf")
-    .is("1234")
-    .get({ songCount: 0 });
-
-  // const artistAlbumnDb = db.open("artist").is("001").open("album").is("ab001");
-
-  // const commands = [
-  //   artistAlbumnDb.open("song").is("s1").when("hasCollab", "=", true),
-  //   artistAlbumnDb.open("song").addLater("s6", {
-  //     title: "Song Number 6",
-  //     genre: "Reggae",
-  //     length: 4.5,
-  //     hasCollab: false,
-  //   }),
-  //   artistAlbumnDb.setLater({
-  //     songCount: 4,
-  //   }),
-  // ];
-
-  // await db.transact(commands);
-
-  // const result = await artistAlbumnDb.get();
-  // expect(result.getItem()).toHaveProperty("songCount", 4);
+test("test init", async () => {
+  const result = await db.init();
+  expect(result).toBe(true);
 });
 
-// test("filter on index", async () => {
-//   const result = await db.open("artist.album.song").where("GS1SK", "=", "artist#001:album#ab001:song#s2")
+test("test add artist", async () => {
+  const result1 = await db.open("artist").add("akon", {
+    name: "Akon Thiam",
+    alias: "Akon",
+    age: 40,
+  });
 
-//   expect(result.getItem()).toHaveProperty("genre", "Rock")
-// })
+  expect(result1).toBe(true);
+
+  const result2 = await db.open("artist").add("iyaz", {
+    name: "Keidran Jones",
+    age: 30,
+    songCount: 100,
+    collabs: new Set(["akon", "madonna", "charice"]),
+  });
+
+  expect(result2).toBe(true);
+
+  const result3 = await db.open("artist").add("charice", {
+    name: db.open("artist").is("charice").toString(),
+  });
+
+  expect(result3).toBe(true);
+});
+
+test("get artist by key", async () => {
+  const result1 = await db.open("artist").is("artist#akon").get();
+  expect(result1).toBe(null);
+
+  const result2 = await db.open("artist").is("akon").get();
+  expect(result2).toHaveProperty("PK", "artist#akon");
+});
+
+test("update artist age", async () => {
+  const result1 = await db
+    .open("artist")
+    .is("akon")
+    .set({
+      age: 50,
+      $set: {
+        songCount: 30,
+      },
+      $remove: {
+        alias: false,
+      },
+    });
+
+  expect(result1).toBe(true);
+
+  const result2 = await db
+    .open("artist")
+    .is("iyaz")
+    .set({
+      $add: {
+        age: 6,
+        songCount: -30,
+      },
+      $delete: {
+        collabs: new Set(["madonna", "akon"]),
+      },
+    });
+
+  expect(result2).toBe(true);
+
+  const result3 = await db.open("artist").is("iyaz").get(true);
+
+  expect(result3).toHaveProperty("age", 36);
+  expect(result3).toHaveProperty("songCount", 70);
+  expect(result3).toHaveProperty("collabs", new Set(["charice"]));
+});
+
+test("delete artist#charice", async () => {
+  const result = await db.open("artist").is("charice").remove();
+
+  expect(result).toBe(true);
+});
+
+test("get all artist", async () => {
+  const result = await db.open("artist").get();
+
+  expect(result.items.length).toBe(2);
+});
+
+test("add album", async () => {
+  const result = await db
+    .open("artist")
+    .is("akon")
+    .open("album")
+    .add("trouble", {
+      year: 2003,
+      songCount: 9,
+    });
+
+  expect(result).toBe(true);
+
+  const result2 = await db
+    .open("artist")
+    .is("akon")
+    .open("album")
+    .add("akonda", {
+      year: 2019,
+      songCount: 10,
+    });
+
+  expect(result2).toBe(true);
+
+  const result3 = await db
+    .open("artist")
+    .is("iyaz")
+    .open("album")
+    .add("replay", {
+      year: 2010,
+      songCount: 12,
+    });
+
+  expect(result3).toBe(true);
+});
+
+test("add song", async () => {
+  const troubleSong = db
+    .open("artist")
+    .is("akon")
+    .open("album")
+    .is("trouble")
+    .open("song");
+
+  const result = await db.transact([
+    troubleSong.addLater("song1", {
+      title: "Song Number 1",
+      genre: "pop",
+      hasCollab: true,
+      collabs: [
+        db.open("artist").is("002").toString(),
+        db.open("artist").is("001").toString(),
+      ],
+    }),
+    troubleSong.addLater("song2", {
+      title: "Song Number 1",
+      genre: "pop",
+    }),
+  ]);
+
+  expect(result).toBe(true);
+});
+
+test("add concert", async () => {
+  const concertModel = db.open("artist").is("iyaz").open("concert");
+
+  const commands = [
+    concertModel.addLater(new Date(2021, 0, 16).getTime(), {
+      price: 200,
+      attendance: 80,
+    }),
+    concertModel.addLater(new Date(2021, 0, 9).getTime(), {
+      price: 200,
+      attendance: 100,
+    }),
+    concertModel.addLater(new Date(2021, 0, 12).getTime(), {
+      price: 200,
+      attendance: 100,
+    }),
+    concertModel.addLater(new Date(2021, 0, 23).getTime(), {
+      price: 200,
+      attendance: 95,
+    }),
+    concertModel.addLater(new Date(2021, 0, 19).getTime(), {
+      price: 200,
+      attendance: 88,
+    }),
+  ];
+
+  const result = await db.transact(commands);
+  expect(result).toBe(true);
+});
+
+test("get all album", async () => {
+  const result = await db.open("artist").is("akon").open("album").get();
+  expect(result.items.length).toBe(2);
+
+  const result2 = await db.open("artist:album").get();
+  expect(result2.items.length).toBe(3);
+});
+
+test("filter cache", async () => {
+  const result = await db.open("artist:album").where("year", ">", 2015);
+  expect(result.items.length).toBe(1);
+
+  const result2 = await db
+    .open("artist:concert")
+    .where("GS1SK", "BETWEEN", [
+      `artist#iyaz:concert#${new Date(2021, 0, 10).getTime()}`,
+      db
+        .open("artist")
+        .is("iyaz")
+        .open("concert")
+        .is(new Date(2021, 0, 20).getTime())
+        .toString(),
+    ]);
+  expect(result2.items.length).toBe(3);
+});

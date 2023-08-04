@@ -1,6 +1,5 @@
 import {
   BillingMode,
-  ConditionCheck,
   CreateTableCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
@@ -32,7 +31,7 @@ export default class DynamoBlade<Schema> {
   }
 
   async init(billingMode: BillingMode = "PAY_PER_REQUEST") {
-    const { client, tableName, getFieldName, getFieldValue } = this.option;
+    const { client, tableName, getFieldName } = this.option;
     const docClient = DynamoDBDocumentClient.from(client);
 
     const command = new CreateTableCommand({

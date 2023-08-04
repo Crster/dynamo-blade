@@ -33,3 +33,10 @@ export type FilterCondition =
   | "IN";
 
 export type QueryResult<T> = { items: Array<T>; next?: string };
+
+export type UpdateValue<T> =
+  | Partial<T>
+  | { $add: Partial<T> }
+  | { $set: Partial<T> }
+  | { $remove: Partial<T> }
+  | { $delete: Partial<T> };
