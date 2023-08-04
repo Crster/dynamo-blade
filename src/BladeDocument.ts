@@ -135,7 +135,6 @@ export default class BladeDocument<Schema> {
       expressionAttributeName.set(`#prop${field.counter}`, prop);
       expressionAttributeValues.set(`:value${field.counter}`, keyValue[prop]);
       field.counter += 1;
-      break;
     }
 
     // Populate Update Expression
