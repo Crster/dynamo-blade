@@ -196,6 +196,9 @@ test("get all album", async () => {
 
   const result2 = await db.open("artist:album").get();
   expect(result2.items.length).toBe(3);
+
+  const key = db.key(result2.items.at(0)[db.field("SORT")], "artist")
+  expect(key).toBe("akon")
 });
 
 test("filter cache", async () => {

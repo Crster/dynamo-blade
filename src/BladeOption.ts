@@ -24,8 +24,27 @@ export default class BladeOption {
   }
 
   isUseIndex = () => {
-    return (this.namespace.size === 1 && !this.key)
-  }
+    return this.namespace.size === 1 && !this.key;
+  };
+
+  getKey = (primaryKey: string, collection?: string) => {
+    let ret: string = null;
+
+    if (primaryKey && primaryKey.includes(this.separator)) {
+      const keyvals = primaryKey.split(":");
+      for (const keyval of keyvals) {
+        const [key, val] = keyval.split(this.separator);
+        if (key === collection) {
+          ret = val;
+          break;
+        } else {
+          ret = val;
+        }
+      }
+    }
+
+    return ret;
+  };
 
   getFieldName = (type: FieldType) => {
     switch (type) {

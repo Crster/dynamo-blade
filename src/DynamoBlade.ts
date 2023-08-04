@@ -1,7 +1,4 @@
-import {
-  BillingMode,
-  CreateTableCommand,
-} from "@aws-sdk/client-dynamodb";
+import { BillingMode, CreateTableCommand } from "@aws-sdk/client-dynamodb";
 import {
   DeleteCommand,
   DynamoDBDocumentClient,
@@ -11,7 +8,7 @@ import {
   TransactWriteCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 
-import { Option, Model } from "./BladeType";
+import { Option, Model, FieldType } from "./BladeType";
 import BladeOption from "./BladeOption";
 import BladeCollection from "./BladeCollection";
 
@@ -27,7 +24,17 @@ export default class DynamoBlade<Schema> {
   }
 
   open<T>(collection: T extends Model<Schema> ? T : Model<Schema>) {
-    return new BladeCollection<Schema[typeof collection]>(this.option.openCollection(collection));
+    return new BladeCollection<Schema[typeof collection]>(
+      this.option.openCollection(collection)
+    );
+  }
+
+  key(primaryKey: string, collection?: string) {
+    return this.option.getKey(primaryKey, collection);
+  }
+
+  field(type: FieldType) {
+    return this.option.getFieldName(type);
   }
 
   async init(billingMode: BillingMode = "PAY_PER_REQUEST") {
@@ -99,9 +106,7 @@ export default class DynamoBlade<Schema> {
     }
   }
 
-  async transact(
-    commands: Array<PutCommand | UpdateCommand | DeleteCommand>
-  ) {
+  async transact(commands: Array<PutCommand | UpdateCommand | DeleteCommand>) {
     const input: TransactWriteCommandInput = {
       ClientRequestToken: Date.now().toString(),
       TransactItems: [],
