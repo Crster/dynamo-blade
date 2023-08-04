@@ -37,7 +37,7 @@ export default class BladeOption {
         if (key === collection) {
           ret = val;
           break;
-        } else {
+        } else if (!collection) {
           ret = val;
         }
       }
