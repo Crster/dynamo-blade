@@ -27,7 +27,7 @@ export default class BladeDocument<Schema> {
     return this.option.getFieldValue("PRIMARY_KEY");
   }
 
-  async get(consistent?: boolean) {
+  async get<T extends Schema>(consistent?: boolean) {
     const { client, tableName, getFieldName, getFieldValue } = this.option;
 
     const command = new GetCommand({
@@ -43,7 +43,7 @@ export default class BladeDocument<Schema> {
 
     try {
       const result = await docClient.send(command);
-      return buildItem<Schema>(result.Item, this.option);
+      return buildItem<T>(result.Item, this.option);
     } catch (err) {
       console.warn(
         `Failed to get ${getFieldValue("PRIMARY_KEY")} (${err.message})`
@@ -52,7 +52,7 @@ export default class BladeDocument<Schema> {
     }
   }
 
-  setLater(value: UpdateValue<Schema>) {
+  setLater<T extends Schema>(value: UpdateValue<T>) {
     const { tableName, getFieldName, getFieldValue } = this.option;
 
     const updateExpression: Array<string> = [];
@@ -165,7 +165,7 @@ export default class BladeDocument<Schema> {
     return command;
   }
 
-  async set(values: UpdateValue<Schema>) {
+  async set<T extends Schema>(values: UpdateValue<T>) {
     const docClient = DynamoDBDocumentClient.from(this.option.client);
     const command = this.setLater(values);
 

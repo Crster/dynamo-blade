@@ -11,6 +11,7 @@ export default class BladeOption {
   public collection: string;
   public tableName: string;
   public separator: string;
+  public forwardScan: boolean;
   public client: DynamoDBClient;
 
   constructor(option: Option) {
@@ -21,6 +22,7 @@ export default class BladeOption {
     this.indexName = option.indexName || "GS1";
     this.separator = option.separator || "#";
     this.namespace = new Map();
+    this.forwardScan = true
   }
 
   isUseIndex = () => {
@@ -158,6 +160,7 @@ export default class BladeOption {
 
     ret.collection = name;
     ret.namespace.set(name, null);
+    ret.forwardScan = this.forwardScan;
 
     return ret;
   };
@@ -179,6 +182,7 @@ export default class BladeOption {
     ret.key = key;
     ret.collection = this.collection;
     ret.namespace.set(this.collection, key);
+    ret.forwardScan = this.forwardScan;
 
     return ret;
   };

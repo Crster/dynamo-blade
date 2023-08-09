@@ -21,7 +21,12 @@ export default class BladeCollection<Schema> {
     return new BladeDocument<Schema>(this.option.openKey(key));
   }
 
-  async get(next?: string) {
+  tail() {
+    this.option.forwardScan = false
+    return this
+  }
+
+  async get<T extends Schema>(next?: string) {
     const { client, tableName, isUseIndex, getFieldName, getFieldValue } =
       this.option;
     const docClient = DynamoDBDocumentClient.from(client);
@@ -36,6 +41,7 @@ export default class BladeCollection<Schema> {
         ":sortKey": getFieldValue("SORT"),
       },
       ExclusiveStartKey: decodeNext(next),
+      ScanIndexForward: this.option.forwardScan
     };
 
     // Using Index
@@ -49,7 +55,7 @@ export default class BladeCollection<Schema> {
 
     try {
       const result = await docClient.send(new QueryCommand(input));
-      return buildItems<Schema>(
+      return buildItems<T>(
         result.Items,
         encodeNext(result.LastEvaluatedKey),
         this.option
@@ -58,11 +64,11 @@ export default class BladeCollection<Schema> {
       console.warn(
         `Failed to get ${getFieldValue("PRIMARY_KEY")} (${err.message})`
       );
-      return buildItems<Schema>([], null, this.option)
+      return buildItems<T>([], null, this.option);
     }
   }
 
-  addLater(key: string, value: Partial<Schema>) {
+  addLater<T extends Schema>(key: string, value: Partial<T>) {
     const { tableName, getFieldName, getFieldValue } = this.option.openKey(key);
 
     const command = new PutCommand({
@@ -79,7 +85,7 @@ export default class BladeCollection<Schema> {
     return command;
   }
 
-  async add(key: string, value: Partial<Schema>) {
+  async add<T extends Schema>(key: string, value: Partial<T>) {
     const command = this.addLater(key, value);
 
     const docClient = DynamoDBDocumentClient.from(this.option.client);
@@ -96,10 +102,10 @@ export default class BladeCollection<Schema> {
     }
   }
 
-  async where<T>(
-    field: T extends Model<Schema> ? T : Model<Schema>,
+  async where<T extends Schema>(
+    field: Model<T>,
     condition: FilterCondition,
-    value: any,
+    value: T[typeof field],
     next?: string
   ) {
     const {
@@ -115,7 +121,7 @@ export default class BladeCollection<Schema> {
     const filterExpression: Array<string> = [];
     const keyConditionExpression: Array<string> = [];
     const expressionAttributeNames = new Map<string, string>();
-    const expressionAttributeValues = new Map<string, string>();
+    const expressionAttributeValues = new Map<string, T[typeof field]>();
 
     const hashKey = isUseIndex()
       ? getFieldName("HASH_INDEX")
@@ -130,13 +136,13 @@ export default class BladeCollection<Schema> {
 
     // Build Key Condition
     keyConditionExpression.push(`${hashKey} = :hashKey`);
-    expressionAttributeValues.set(":hashKey", hashKeyValue);
+    expressionAttributeValues.set(":hashKey", hashKeyValue as any);
 
     // Build Filter Condition
     if (field !== sortKey) {
       if (!isUseIndex()) {
         keyConditionExpression.push(`begins_with(${sortKey}, :sortKey)`);
-        expressionAttributeValues.set(":sortKey", collection);
+        expressionAttributeValues.set(":sortKey", collection as any);
       }
     }
 
@@ -212,18 +218,19 @@ export default class BladeCollection<Schema> {
       ExpressionAttributeValues: Object.fromEntries(expressionAttributeValues),
       ExpressionAttributeNames: Object.fromEntries(expressionAttributeNames),
       ExclusiveStartKey: decodeNext(next),
+      ScanIndexForward: this.option.forwardScan
     });
 
     try {
       const result = await docClient.send(command);
-      return buildItems<Schema>(
+      return buildItems<T>(
         result.Items,
         encodeNext(result.LastEvaluatedKey),
         this.option
       );
     } catch (err) {
       console.warn(`Failed to get ${collection} (${err.message})`);
-      return buildItems<Schema>([], null, this.option)
+      return buildItems<T>([], null, this.option);
     }
   }
 }
