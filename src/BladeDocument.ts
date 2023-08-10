@@ -5,10 +5,10 @@ import {
   GetCommand,
 } from "@aws-sdk/lib-dynamodb";
 
-import { buildItem } from "./utils";
 import BladeOption from "./BladeOption";
 import BladeCollection from "./BladeCollection";
 import { Model, UpdateValue } from "./BladeType";
+import { buildItem } from "./utils";
 
 export default class BladeDocument<Schema> {
   private option: BladeOption;

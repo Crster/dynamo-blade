@@ -5,7 +5,7 @@ import {
   QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 
-import { decodeNext, buildItems, encodeNext } from "./utils/index";
+import { decodeNext, buildItems, encodeNext, buildItem } from "./utils/index";
 import BladeOption from "./BladeOption";
 import BladeDocument from "./BladeDocument";
 import { FilterCondition, Model } from "./BladeType";
@@ -22,8 +22,8 @@ export default class BladeCollection<Schema> {
   }
 
   tail() {
-    this.option.forwardScan = false
-    return this
+    this.option.forwardScan = false;
+    return this;
   }
 
   async get<T extends Schema>(next?: string) {
@@ -41,7 +41,7 @@ export default class BladeCollection<Schema> {
         ":sortKey": getFieldValue("SORT"),
       },
       ExclusiveStartKey: decodeNext(next),
-      ScanIndexForward: this.option.forwardScan
+      ScanIndexForward: this.option.forwardScan,
     };
 
     // Using Index
@@ -65,6 +65,50 @@ export default class BladeCollection<Schema> {
         `Failed to get ${getFieldValue("PRIMARY_KEY")} (${err.message})`
       );
       return buildItems<T>([], null, this.option);
+    }
+  }
+
+  async getAll<T>(
+    collections: Array<T extends Model<Schema> ? T : Model<Schema>>,
+    key: string,
+    next?: string
+  ) {
+    const { client, tableName, separator, getFieldName, getFieldValue } =
+      this.option.openKey(key);
+    const docClient = DynamoDBDocumentClient.from(client);
+
+    const input: QueryCommandInput = {
+      TableName: tableName,
+      KeyConditionExpression: `${getFieldName("HASH")} = :hashKey`,
+      ExpressionAttributeValues: {
+        ":hashKey": getFieldValue("PRIMARY_KEY"),
+      },
+      ExclusiveStartKey: decodeNext(next),
+      ScanIndexForward: this.option.forwardScan,
+    };
+
+    try {
+      const result = await docClient.send(new QueryCommand(input));
+      const ret: Array<{ collection: T; data: any }> = [];
+
+      for (const item of result.Items) {
+        const sort: string = item[getFieldName("SORT")];
+
+        const collectionName = sort.split(separator).at(0) as T;
+        if (collections.includes(collectionName as any)) {
+          ret.push({
+            collection: collectionName,
+            data: buildItem(item, this.option),
+          });
+        }
+      }
+
+      return ret;
+    } catch (err) {
+      console.warn(
+        `Failed to get ${getFieldValue("PRIMARY_KEY")} (${err.message})`
+      );
+      return null;
     }
   }
 
@@ -218,7 +262,7 @@ export default class BladeCollection<Schema> {
       ExpressionAttributeValues: Object.fromEntries(expressionAttributeValues),
       ExpressionAttributeNames: Object.fromEntries(expressionAttributeNames),
       ExclusiveStartKey: decodeNext(next),
-      ScanIndexForward: this.option.forwardScan
+      ScanIndexForward: this.option.forwardScan,
     });
 
     try {
