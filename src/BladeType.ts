@@ -32,6 +32,24 @@ export type FilterCondition =
   | "BEGINS_WITH"
   | "IN";
 
+export type UpdateCondition =
+  | "="
+  | "!="
+  | ">"
+  | ">="
+  | "<"
+  | "<="
+  | "BETWEEN"
+  | "BEGINS_WITH"
+  | "IN"
+  | "ATTRIBUTE_EXISTS"
+  | "ATTRIBUTE_NOT_EXISTS"
+  | "ATTRIBUTE_TYPE"
+  | "CONTAINS"
+  | "SIZE"
+  | "SIZE_GT"
+  | "SIZE_LT";
+
 export type QueryResult<T> = { items: Array<T>; next?: string };
 
 export type RemoveValue<T> = {
@@ -44,3 +62,9 @@ export type UpdateValue<T> =
   | { $set: Partial<T> }
   | { $remove: RemoveValue<T> }
   | { $delete: Partial<T> };
+
+export type UpdateConditionValue<T> = {
+  field: T
+  condition: UpdateCondition
+  value: any
+}

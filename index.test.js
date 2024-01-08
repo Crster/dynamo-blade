@@ -141,7 +141,42 @@ test("add song", async () => {
     .is("trouble")
     .open("song");
 
+  db.transact([
+    troubleSong.is("song3").setLater({
+      name: "Kool",
+      $add: {
+        fever: 3,
+        totalFever: 1,
+      },
+    }),
+  ]);
+
+  troubleSong.is("song3").set({
+    name: "Kool",
+    $add: {
+      fever: 3,
+      totalFever: 1,
+    },
+  })
+
+  db.transact([
+    troubleSong.is("song3").setLater({
+      name: "Kool",
+      $add: {
+        fever: 3,
+        totalFever: 1,
+      },
+    }),
+  ]);
+
   const result = await db.transact([
+    troubleSong.is("song3").setLater({
+      name: "Kool",
+      $add: {
+        fever: 3,
+        totalFever: 1,
+      },
+    }),
     troubleSong.addLater("song1", {
       title: "Song Number 1",
       genre: "pop",
@@ -158,6 +193,49 @@ test("add song", async () => {
   ]);
 
   expect(result).toBe(true);
+});
+
+test("update with condition", async () => {
+  const troubleSong = db
+    .open("artist")
+    .is("akon")
+    .open("album")
+    .is("trouble")
+    .open("song");
+
+  const result = await troubleSong.is("song3").set(
+    {
+      name: "Kool",
+      fever: 2,
+    },
+    [
+      {
+        field: "fever",
+        condition: "ATTRIBUTE_TYPE",
+        value: "N",
+      },
+    ]
+  );
+
+  expect(result).toBe(true);
+
+  const result2 = await db.transact([
+    troubleSong.is("song3").setLater(
+      {
+        name: "Kool Kid",
+        fever: 33,
+      },
+      [
+        {
+          field: "fever",
+          condition: "=",
+          value: 2,
+        },
+      ]
+    ),
+  ]);
+
+  expect(result2).toBe(true);
 });
 
 test("add concert", async () => {

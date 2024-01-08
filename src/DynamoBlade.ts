@@ -1,4 +1,8 @@
-import { BillingMode, CreateTableCommand } from "@aws-sdk/client-dynamodb";
+import { randomUUID } from "crypto"
+import {
+  BillingMode,
+  CreateTableCommand,
+} from "@aws-sdk/client-dynamodb";
 import {
   DeleteCommand,
   DynamoDBDocumentClient,
@@ -108,7 +112,7 @@ export default class DynamoBlade<Schema> {
 
   async transact(commands: Array<PutCommand | UpdateCommand | DeleteCommand>) {
     const input: TransactWriteCommandInput = {
-      ClientRequestToken: Date.now().toString(),
+      ClientRequestToken: randomUUID(),
       TransactItems: [],
     };
 
@@ -148,18 +152,28 @@ export default class DynamoBlade<Schema> {
     }
 
     if (input.TransactItems.length > 0) {
+      let retryCount = 3;
       const transaction = new TransactWriteCommand(input);
       const docClient = DynamoDBDocumentClient.from(this.option.client);
 
-      try {
-        const result = await docClient.send(transaction);
-        return result.$metadata.httpStatusCode === 200;
-      } catch (err) {
-        console.warn(
-          `Failed to transact ${input.TransactItems.length} items (${err.message})`
-        );
-        return false;
-      }
+      do {
+        try {
+          const result = await docClient.send(transaction);
+          return result.$metadata.httpStatusCode === 200;
+        } catch (err) {
+          console.warn(
+            `Failed to transact ${input.TransactItems.length} items (${err.message})`
+          );
+
+          if (err.message && err.message.includes("TransactionConflict")) {
+            retryCount--;
+          } else {
+            retryCount = 0;
+          }
+        }
+      } while (retryCount);
+
+      return false;
     } else {
       return true;
     }
