@@ -21,7 +21,7 @@ test("test add artist", async () => {
     age: 40,
   });
 
-  expect(result1).toBe(true);
+  expect(result1).toBe("akon");
 
   const result2 = await db.open("artist").add("iyaz", {
     name: "Keidran Jones",
@@ -30,13 +30,13 @@ test("test add artist", async () => {
     collabs: new Set(["akon", "madonna", "charice"]),
   });
 
-  expect(result2).toBe(true);
+  expect(result2).toBe("iyaz");
 
   const result3 = await db.open("artist").add("charice", {
     name: db.open("artist").is("charice").toString(),
   });
 
-  expect(result3).toBe(true);
+  expect(result3).toBe("charice");
 });
 
 test("get artist by key", async () => {
@@ -108,7 +108,7 @@ test("add album", async () => {
       songCount: 9,
     });
 
-  expect(result).toBe(true);
+  expect(result).toBe("trouble");
 
   const result2 = await db
     .open("artist")
@@ -119,7 +119,7 @@ test("add album", async () => {
       songCount: 10,
     });
 
-  expect(result2).toBe(true);
+  expect(result2).toBe("akonda");
 
   const result3 = await db
     .open("artist")
@@ -130,7 +130,7 @@ test("add album", async () => {
       songCount: 12,
     });
 
-  expect(result3).toBe(true);
+  expect(result3).toBe("replay");
 });
 
 test("add song", async () => {

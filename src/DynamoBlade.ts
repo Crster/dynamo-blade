@@ -1,13 +1,11 @@
-import { randomUUID } from "crypto"
-import {
-  BillingMode,
-  CreateTableCommand,
-} from "@aws-sdk/client-dynamodb";
+import { randomUUID } from "crypto";
+import { BillingMode, CreateTableCommand } from "@aws-sdk/client-dynamodb";
 import {
   DeleteCommand,
   DynamoDBDocumentClient,
   PutCommand,
   UpdateCommand,
+  QueryCommand,
   TransactWriteCommand,
   TransactWriteCommandInput,
 } from "@aws-sdk/lib-dynamodb";
@@ -110,7 +108,10 @@ export default class DynamoBlade<Schema> {
     }
   }
 
-  async transact(commands: Array<PutCommand | UpdateCommand | DeleteCommand>) {
+  async transact(
+    commands: Array<PutCommand | UpdateCommand | DeleteCommand | QueryCommand>,
+    retry?: boolean
+  ) {
     const input: TransactWriteCommandInput = {
       ClientRequestToken: randomUUID(),
       TransactItems: [],
@@ -148,11 +149,21 @@ export default class DynamoBlade<Schema> {
             ExpressionAttributeValues: command.input.ExpressionAttributeValues,
           },
         });
+      } else if (command instanceof QueryCommand) {
+        input.TransactItems.push({
+          ConditionCheck: {
+            TableName: command.input.TableName,
+            Key: command.input.ExclusiveStartKey,
+            ConditionExpression: command.input.FilterExpression,
+            ExpressionAttributeNames: command.input.ExpressionAttributeNames,
+            ExpressionAttributeValues: command.input.ExpressionAttributeValues,
+          },
+        });
       }
     }
 
     if (input.TransactItems.length > 0) {
-      let retryCount = 3;
+      let retryCount = retry ? 3 : 1;
       const transaction = new TransactWriteCommand(input);
       const docClient = DynamoDBDocumentClient.from(this.option.client);
 
@@ -171,7 +182,7 @@ export default class DynamoBlade<Schema> {
             retryCount = 0;
           }
         }
-      } while (retryCount);
+      } while (retryCount > 0);
 
       return false;
     } else {

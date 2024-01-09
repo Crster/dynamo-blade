@@ -21,7 +21,7 @@ export type FieldType =
 
 export type BillingMode = "PROVISIONED" | "PAY_PER_REQUEST";
 
-export type FilterCondition =
+export type SimpleFilter =
   | "="
   | "!="
   | ">"
@@ -32,16 +32,7 @@ export type FilterCondition =
   | "BEGINS_WITH"
   | "IN";
 
-export type UpdateCondition =
-  | "="
-  | "!="
-  | ">"
-  | ">="
-  | "<"
-  | "<="
-  | "BETWEEN"
-  | "BEGINS_WITH"
-  | "IN"
+export type ExtraFilter =
   | "ATTRIBUTE_EXISTS"
   | "ATTRIBUTE_NOT_EXISTS"
   | "ATTRIBUTE_TYPE"
@@ -50,11 +41,13 @@ export type UpdateCondition =
   | "SIZE_GT"
   | "SIZE_LT";
 
+export type Condition = SimpleFilter & ExtraFilter;
+
 export type QueryResult<T> = { items: Array<T>; next?: string };
 
 export type RemoveValue<T> = {
-  [P in keyof T]?: boolean
-}
+  [P in keyof T]?: boolean;
+};
 
 export type UpdateValue<T> =
   | Partial<T>
@@ -63,8 +56,8 @@ export type UpdateValue<T> =
   | { $remove: RemoveValue<T> }
   | { $delete: Partial<T> };
 
-export type UpdateConditionValue<T> = {
-  field: T
-  condition: UpdateCondition
-  value: any
-}
+export type ConditionDefination<T> = {
+  field: T;
+  condition: Condition;
+  value: any;
+};

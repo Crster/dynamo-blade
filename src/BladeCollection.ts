@@ -8,7 +8,7 @@ import {
 import { decodeNext, buildItems, encodeNext, buildItem } from "./utils/index";
 import BladeOption from "./BladeOption";
 import BladeDocument from "./BladeDocument";
-import { FilterCondition, Model } from "./BladeType";
+import { SimpleFilter, Model } from "./BladeType";
 
 export default class BladeCollection<Schema> {
   private option: BladeOption;
@@ -135,7 +135,7 @@ export default class BladeCollection<Schema> {
     const docClient = DynamoDBDocumentClient.from(this.option.client);
     try {
       const result = await docClient.send(command);
-      return result.$metadata.httpStatusCode === 200;
+      return result.$metadata.httpStatusCode === 200 ? key : null;
     } catch (err) {
       console.warn(
         `Failed to add ${this.option.getFieldValue("PRIMARY_KEY")} (${
@@ -148,7 +148,7 @@ export default class BladeCollection<Schema> {
 
   async where<T extends Schema>(
     field: Model<T>,
-    condition: FilterCondition,
+    condition: SimpleFilter,
     value: T[typeof field],
     next?: string
   ) {

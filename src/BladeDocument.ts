@@ -3,11 +3,12 @@ import {
   DeleteCommand,
   UpdateCommand,
   GetCommand,
+  QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 
 import BladeOption from "./BladeOption";
 import BladeCollection from "./BladeCollection";
-import { Model, UpdateConditionValue, UpdateValue } from "./BladeType";
+import { ConditionDefination, Model, UpdateValue } from "./BladeType";
 import { buildItem } from "./utils";
 
 export default class BladeDocument<Schema> {
@@ -52,9 +53,199 @@ export default class BladeDocument<Schema> {
     }
   }
 
+  async validateLater<T extends Schema>(
+    conditions: Array<ConditionDefination<T>>
+  ) {
+    const { tableName, getFieldName, getFieldValue } = this.option;
+
+    const expressionAttributeName = new Map<string, string>();
+    const expressionAttributeValues = new Map<string, any>();
+
+    // Build Condition Expression
+    const updateConditions = [];
+
+    if (conditions && Array.isArray(conditions) && conditions.length > 0) {
+      for (let xx = 0; xx < conditions.length; xx++) {
+        const condition = conditions[xx];
+
+        switch (condition.condition) {
+          case "=":
+            updateConditions.push(`#conField${xx} = :conValue${xx}`);
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              condition.field as string
+            );
+            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
+            break;
+          case "!=":
+            updateConditions.push(`#conField${xx} <> :conValue${xx}`);
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              condition.field as string
+            );
+            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
+            break;
+          case "<":
+            updateConditions.push(`#conField${xx} < :conValue${xx}`);
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              String(condition.field)
+            );
+            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
+            break;
+          case "<=":
+            updateConditions.push(`#conField${xx} <= :conValue${xx}`);
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              String(condition.field)
+            );
+            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
+            break;
+          case ">":
+            updateConditions.push(`#conField${xx} > :conValue${xx}`);
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              String(condition.field)
+            );
+            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
+            break;
+          case ">=":
+            updateConditions.push(`#conField${xx} >= :conValue${xx}`);
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              String(condition.field)
+            );
+            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
+            break;
+          case "BETWEEN":
+            if (
+              Array.isArray(condition.value) &&
+              condition.value.length === 2
+            ) {
+              updateConditions.push(
+                `#conField${xx} BETWEEN :conValueFrom${xx} AND :conValueTo${xx}`
+              );
+              expressionAttributeName.set(
+                `#conField${xx}`,
+                String(condition.field)
+              );
+              expressionAttributeValues.set(
+                `:conValueFrom${xx}`,
+                condition.value.at(0)
+              );
+              expressionAttributeValues.set(
+                `:conValueTo${xx}`,
+                condition.value.at(1)
+              );
+            }
+            break;
+          case "IN":
+            if (Array.isArray(condition.value)) {
+              const values: Array<any> = [];
+              condition.value.forEach((val, index) => {
+                values.push(`:conValue${xx}${index}`);
+                expressionAttributeValues.set(`:conValue${xx}${index}`, val);
+              });
+
+              updateConditions.push(
+                `#conField${xx} IN (${condition.value.join(",")})`
+              );
+              expressionAttributeName.set(
+                `#conField${xx}`,
+                String(condition.field)
+              );
+            }
+            break;
+          case "BEGINS_WITH":
+            updateConditions.push(
+              `begins_with(#conField${xx}, :conValue${xx})`
+            );
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              String(condition.field)
+            );
+            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
+            break;
+          case "ATTRIBUTE_EXISTS":
+            updateConditions.push(`attribute_exists(#conField${xx})`);
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              String(condition.field)
+            );
+            break;
+          case "ATTRIBUTE_NOT_EXISTS":
+            updateConditions.push(`attribute_not_exists(#conField${xx})`);
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              String(condition.field)
+            );
+            break;
+          case "ATTRIBUTE_TYPE":
+            updateConditions.push(
+              `attribute_type(#conField${xx}, :conValue${xx})`
+            );
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              String(condition.field)
+            );
+            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
+            break;
+          case "CONTAINS":
+            updateConditions.push(`contains(#conField${xx}, :conValue${xx})`);
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              String(condition.field)
+            );
+            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
+            break;
+          case "SIZE":
+            updateConditions.push(`size(#conField${xx}) = :conValue${xx}`);
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              String(condition.field)
+            );
+            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
+            break;
+          case "SIZE_GT":
+            updateConditions.push(`size(#conField${xx}) < :conValue${xx}`);
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              String(condition.field)
+            );
+            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
+            break;
+          case "SIZE_LT":
+            updateConditions.push(`size(#conField${xx}) > :conValue${xx}`);
+            expressionAttributeName.set(
+              `#conField${xx}`,
+              String(condition.field)
+            );
+            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
+            break;
+        }
+      }
+    }
+
+    const command = new QueryCommand({
+      TableName: tableName,
+      ExclusiveStartKey: {
+        [getFieldName("HASH")]: getFieldValue("HASH"),
+        [getFieldName("SORT")]: getFieldValue("SORT"),
+      },
+      ExpressionAttributeNames: Object.fromEntries(expressionAttributeName),
+      ExpressionAttributeValues: Object.fromEntries(expressionAttributeValues),
+      FilterExpression:
+        updateConditions.length > 0
+          ? updateConditions.join(" AND ")
+          : undefined,
+    });
+
+    return command;
+  }
+
   setLater<T extends Schema>(
     value: UpdateValue<T>,
-    conditions?: Array<UpdateConditionValue<T>>
+    conditions?: Array<ConditionDefination<T>>
   ) {
     const { tableName, getFieldName, getFieldValue } = this.option;
 
@@ -339,7 +530,7 @@ export default class BladeDocument<Schema> {
 
   async set<T extends Schema>(
     values: UpdateValue<T>,
-    conditions?: Array<UpdateConditionValue<T>>
+    conditions?: Array<ConditionDefination<T>>
   ) {
     const docClient = DynamoDBDocumentClient.from(this.option.client);
     const command = this.setLater(values, conditions);
