@@ -54,7 +54,7 @@ export default class BladeDocument<Schema> {
   }
 
   validateLater<T extends Schema>(
-    conditions: Array<ConditionDefination<T>>
+    conditions: Array<ConditionDefination<keyof T>>
   ) {
     const { tableName, getFieldName, getFieldValue } = this.option;
 
@@ -245,7 +245,7 @@ export default class BladeDocument<Schema> {
 
   setLater<T extends Schema>(
     value: UpdateValue<T>,
-    conditions?: Array<ConditionDefination<T>>
+    conditions?: Array<ConditionDefination<keyof T>>
   ) {
     const { tableName, getFieldName, getFieldValue } = this.option;
 
@@ -530,7 +530,7 @@ export default class BladeDocument<Schema> {
 
   async set<T extends Schema>(
     values: UpdateValue<T>,
-    conditions?: Array<ConditionDefination<T>>
+    conditions?: Array<ConditionDefination<keyof T>>
   ) {
     const docClient = DynamoDBDocumentClient.from(this.option.client);
     const command = this.setLater(values, conditions);

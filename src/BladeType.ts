@@ -41,7 +41,7 @@ export type ExtraFilter =
   | "SIZE_GT"
   | "SIZE_LT";
 
-export type Condition = SimpleFilter & ExtraFilter;
+export type Condition = SimpleFilter | ExtraFilter;
 
 export type QueryResult<T> = { items: Array<T>; next?: string };
 
@@ -59,5 +59,5 @@ export type UpdateValue<T> =
 export type ConditionDefination<T> = {
   field: T;
   condition: Condition;
-  value: any;
+  value?: any;
 };

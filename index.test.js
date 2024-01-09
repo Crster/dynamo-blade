@@ -157,7 +157,7 @@ test("add song", async () => {
       fever: 3,
       totalFever: 1,
     },
-  })
+  });
 
   db.transact([
     troubleSong.is("song3").setLater({
@@ -236,6 +236,39 @@ test("update with condition", async () => {
   ]);
 
   expect(result2).toBe(true);
+
+  const result3 = await db.transact([
+    troubleSong.is("song5").setLater(
+      {
+        name: "Numba Gal",
+        $add: {
+          volumn: 2.55,
+        },
+      },
+      [
+        {
+          field: "ANY",
+          condition: "ATTRIBUTE_NOT_EXISTS"
+        },
+      ]
+    ),
+    troubleSong.is("song6").setLater(
+      {
+        name: "Goldwin",
+        $add: {
+          volumn: 0.45,
+        },
+      },
+      [
+        {
+          field: "ANY",
+          condition: "ATTRIBUTE_NOT_EXISTS"
+        },
+      ]
+    ),
+  ]);
+
+  expect(result3).toBe(true);
 });
 
 test("conditional transaction", async () => {
@@ -249,19 +282,19 @@ test("conditional transaction", async () => {
   const result = await db.transact([
     troubleSong.addLater("song4", {
       year: 2015,
-      songCount: 55
+      songCount: 55,
     }),
     troubleSong.is("song3").validateLater([
       {
         field: "fever",
         condition: "BETWEEN",
-        value: [30, 40]
-      }
-    ])
-  ])
+        value: [30, 40],
+      },
+    ]),
+  ]);
 
-  expect(result).toBe(true)
-})
+  expect(result).toBe(true);
+});
 
 test("add concert", async () => {
   const concertModel = db.open("artist").is("iyaz").open("concert");
@@ -300,8 +333,8 @@ test("get all album", async () => {
   const result2 = await db.open("artist:album").tail().get();
   expect(result2.items.length).toBe(3);
 
-  const key = db.key(result2.items.at(0)[db.field("SORT")], "artist")
-  expect(key).toBe("iyaz")
+  const key = db.key(result2.items.at(0)[db.field("SORT")], "artist");
+  expect(key).toBe("iyaz");
 });
 
 test("filter cache", async () => {
