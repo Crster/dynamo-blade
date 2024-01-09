@@ -238,6 +238,31 @@ test("update with condition", async () => {
   expect(result2).toBe(true);
 });
 
+test("conditional transaction", async () => {
+  const troubleSong = db
+    .open("artist")
+    .is("akon")
+    .open("album")
+    .is("trouble")
+    .open("song");
+
+  const result = await db.transact([
+    troubleSong.addLater("song4", {
+      year: 2015,
+      songCount: 55
+    }),
+    troubleSong.is("song3").validateLater([
+      {
+        field: "fever",
+        condition: "BETWEEN",
+        value: [30, 40]
+      }
+    ])
+  ])
+
+  expect(result).toBe(true)
+})
+
 test("add concert", async () => {
   const concertModel = db.open("artist").is("iyaz").open("concert");
 

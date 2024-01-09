@@ -53,7 +53,7 @@ export default class BladeDocument<Schema> {
     }
   }
 
-  async validateLater<T extends Schema>(
+  validateLater<T extends Schema>(
     conditions: Array<ConditionDefination<T>>
   ) {
     const { tableName, getFieldName, getFieldValue } = this.option;
