@@ -117,8 +117,23 @@ export default class DynamoBlade<Schema> {
       TransactItems: [],
     };
 
+    const itemKeys = [];
+
     for (const command of commands) {
       if (command instanceof PutCommand) {
+        if (
+          command.input.Item &&
+          command.input.Item[this.option.getFieldName("HASH")] &&
+          command.input.Item[this.option.getFieldName("SORT")]
+        ) {
+          itemKeys.push({
+            Type: "PUT",
+            Key: `${command.input.Item[this.option.getFieldName("HASH")]}:${
+              command.input.Item[this.option.getFieldName("SORT")]
+            }`,
+          });
+        }
+
         input.TransactItems.push({
           Put: {
             TableName: command.input.TableName,
@@ -129,6 +144,15 @@ export default class DynamoBlade<Schema> {
           },
         });
       } else if (command instanceof UpdateCommand) {
+        if (command.input.Key) {
+          itemKeys.push({
+            Type: "UPDATE",
+            Key: `${command.input.Key[this.option.getFieldName("HASH")]}:${
+              command.input.Key[this.option.getFieldName("SORT")]
+            }`,
+          });
+        }
+
         input.TransactItems.push({
           Update: {
             TableName: command.input.TableName,
@@ -140,6 +164,15 @@ export default class DynamoBlade<Schema> {
           },
         });
       } else if (command instanceof DeleteCommand) {
+        if (command.input.Key) {
+          itemKeys.push({
+            Type: "UPDATE",
+            Key: `${command.input.Key[this.option.getFieldName("HASH")]}:${
+              command.input.Key[this.option.getFieldName("SORT")]
+            }`,
+          });
+        }
+
         input.TransactItems.push({
           Delete: {
             TableName: command.input.TableName,
@@ -150,6 +183,17 @@ export default class DynamoBlade<Schema> {
           },
         });
       } else if (command instanceof QueryCommand) {
+        if (command.input.ExclusiveStartKey) {
+          itemKeys.push({
+            Type: "QUERY",
+            Key: `${
+              command.input.ExclusiveStartKey[this.option.getFieldName("HASH")]
+            }:${
+              command.input.ExclusiveStartKey[this.option.getFieldName("SORT")]
+            }`,
+          });
+        }
+
         input.TransactItems.push({
           ConditionCheck: {
             TableName: command.input.TableName,
@@ -166,17 +210,16 @@ export default class DynamoBlade<Schema> {
       let retryCount = retry ? 3 : 1;
       const transaction = new TransactWriteCommand(input);
       const docClient = DynamoDBDocumentClient.from(this.option.client);
+      let lastestError = null;
 
       do {
         try {
           const result = await docClient.send(transaction);
           return result.$metadata.httpStatusCode === 200;
         } catch (err) {
-          console.warn(
-            `Failed to transact ${input.TransactItems.length} items (${err.message})`
-          );
+          lastestError = err;
 
-          if (err.message && err.message.includes("TransactionConflict")) {
+          if (err.$fault === "client") {
             retryCount--;
           } else {
             retryCount = 0;
@@ -184,7 +227,15 @@ export default class DynamoBlade<Schema> {
         }
       } while (retryCount > 0);
 
-      return false;
+      console.warn(
+        JSON.stringify({
+          message: `Failed to transact ${input.TransactItems.length} items (${lastestError.message})`,
+          data: itemKeys,
+        }),
+        null,
+        2
+      );
+      throw lastestError;
     } else {
       return true;
     }

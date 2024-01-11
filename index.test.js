@@ -4,8 +4,8 @@ const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const db = new DynamoBlade({
   tableName: "testdb",
   client: new DynamoDBClient({
-    region: "local",
-    endpoint: "http://localhost:8000",
+    region: "us-east-1",
+    // endpoint: "http://localhost:8000",
   }),
 });
 
