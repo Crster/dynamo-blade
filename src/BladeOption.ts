@@ -1,5 +1,5 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { FieldType, Option } from "./BladeType";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
 export default class BladeOption {
   private hashKey: string;
@@ -12,7 +12,7 @@ export default class BladeOption {
   public tableName: string;
   public separator: string;
   public forwardScan: boolean;
-  public client: DynamoDBClient;
+  public client: DynamoDBDocumentClient;
 
   constructor(option: Option) {
     this.client = option.client;
@@ -113,19 +113,6 @@ export default class BladeOption {
         break;
       case "SORT_INDEX": // Get First and Last
         for (const [key, value] of this.namespace.entries()) {
-          // if (counter == 1) {
-          //   if (value) {
-          //     ret.push(`${key}${this.separator}${value}`);
-          //   } else {
-          //     ret.push(`${key}${this.separator}`);
-          //   }
-          // } else if (counter >= this.namespace.size) {
-          //   if (value) {
-          //     ret.push(`${key}${this.separator}${value}`);
-          //   } else {
-          //     ret.push(`${key}${this.separator}`);
-          //   }
-          // }
           if (counter >= this.namespace.size) {
             ret.push(value ?? key)
           }

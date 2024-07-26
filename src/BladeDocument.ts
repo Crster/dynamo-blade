@@ -40,10 +40,8 @@ export default class BladeDocument<Schema> {
       ConsistentRead: consistent,
     });
 
-    const docClient = DynamoDBDocumentClient.from(client);
-
     try {
-      const result = await docClient.send(command);
+      const result = await client.send(command);
       return buildItem<T>(result.Item, this.option);
     } catch (err) {
       console.warn(
@@ -532,11 +530,10 @@ export default class BladeDocument<Schema> {
     values: UpdateValue<T>,
     conditions?: Array<ConditionDefination<keyof T>>
   ) {
-    const docClient = DynamoDBDocumentClient.from(this.option.client);
     const command = this.setLater(values, conditions);
 
     try {
-      const result = await docClient.send(command);
+      const result = await this.option.client.send(command);
       return result.$metadata.httpStatusCode === 200;
     } catch (err) {
       console.warn(
@@ -563,11 +560,10 @@ export default class BladeDocument<Schema> {
   }
 
   async remove() {
-    const docClient = DynamoDBDocumentClient.from(this.option.client);
     const command = this.removeLater();
 
     try {
-      const result = await docClient.send(command);
+      const result = await this.option.client.send(command);
       return result.$metadata.httpStatusCode === 200;
     } catch (err) {
       console.warn(

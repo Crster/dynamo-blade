@@ -1,16 +1,15 @@
 import { randomUUID } from "crypto";
-import { BillingMode, CreateTableCommand } from "@aws-sdk/client-dynamodb";
 import {
   DeleteCommand,
-  DynamoDBDocumentClient,
   PutCommand,
   UpdateCommand,
   QueryCommand,
   TransactWriteCommand,
   TransactWriteCommandInput,
 } from "@aws-sdk/lib-dynamodb";
+import { BillingMode, CreateTableCommand } from "@aws-sdk/client-dynamodb";
 
-import { Option, FieldType, Entity } from './BladeType';
+import { Option, FieldType, Entity } from "./BladeType";
 import BladeOption from "./BladeOption";
 import BladeCollection from "./BladeCollection";
 
@@ -41,7 +40,6 @@ export default class DynamoBlade<Schema> {
 
   async init(billingMode: BillingMode = "PAY_PER_REQUEST") {
     const { client, tableName, getFieldName } = this.option;
-    const docClient = DynamoDBDocumentClient.from(client);
 
     const command = new CreateTableCommand({
       TableName: tableName,
@@ -95,7 +93,7 @@ export default class DynamoBlade<Schema> {
     });
 
     try {
-      await docClient.send(command);
+      await client.send(command);
       return true;
     } catch (err) {
       if (err.name === "ResourceInUseException") {
@@ -209,12 +207,11 @@ export default class DynamoBlade<Schema> {
     if (input.TransactItems.length > 0) {
       let retryCount = retry ? 3 : 1;
       const transaction = new TransactWriteCommand(input);
-      const docClient = DynamoDBDocumentClient.from(this.option.client);
       let lastestError = null;
 
       do {
         try {
-          const result = await docClient.send(transaction);
+          const result = await this.option.client.send(transaction);
           return result.$metadata.httpStatusCode === 200;
         } catch (err) {
           lastestError = err;

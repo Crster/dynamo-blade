@@ -30,7 +30,6 @@ export default class BladeCollection<Schema> {
   async get<T extends EntityField<Schema>>(next?: string) {
     const { client, tableName, isUseIndex, getFieldName, getFieldValue } =
       this.option;
-    const docClient = DynamoDBDocumentClient.from(client);
 
     const input: QueryCommandInput = {
       TableName: tableName,
@@ -55,7 +54,7 @@ export default class BladeCollection<Schema> {
     }
 
     try {
-      const result = await docClient.send(new QueryCommand(input));
+      const result = await this.option.client.send(new QueryCommand(input));
       return buildItems<T>(
         result.Items,
         encodeNext(result.LastEvaluatedKey),
@@ -76,7 +75,6 @@ export default class BladeCollection<Schema> {
   ) {
     const { client, tableName, separator, getFieldName, getFieldValue } =
       this.option.openKey(key);
-    const docClient = DynamoDBDocumentClient.from(client);
 
     const input: QueryCommandInput = {
       TableName: tableName,
@@ -89,7 +87,7 @@ export default class BladeCollection<Schema> {
     };
 
     try {
-      const result = await docClient.send(new QueryCommand(input));
+      const result = await this.option.client.send(new QueryCommand(input));
       const ret: Array<{ collection: T; data: any }> = [];
 
       for (const item of result.Items) {
@@ -132,10 +130,8 @@ export default class BladeCollection<Schema> {
 
   async add<T extends EntityField<Schema>>(key: string, value: Partial<T>) {
     const command = this.addLater(key, value);
-
-    const docClient = DynamoDBDocumentClient.from(this.option.client);
     try {
-      const result = await docClient.send(command);
+      const result = await this.option.client.send(command);
       return result.$metadata.httpStatusCode === 200 ? key : null;
     } catch (err) {
       console.warn(

@@ -1,4 +1,4 @@
-import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import BladeOption from "./BladeOption";
 import { SimpleFilter } from "./BladeType";
 import { buildItems, decodeNext, encodeNext } from "./utils";
@@ -35,7 +35,6 @@ export default class BladeFilter<Schema> {
       getFieldName,
       getFieldValue,
     } = this.option;
-    const docClient = DynamoDBDocumentClient.from(client);
 
     const filterExpression: Array<string> = [];
     const keyConditionExpression: Array<string> = [];
@@ -154,7 +153,7 @@ export default class BladeFilter<Schema> {
         ScanIndexForward: this.option.forwardScan,
       });
 
-      const result = await docClient.send(command);
+      const result = await client.send(command);
       return buildItems<Schema>(
         result.Items,
         encodeNext(result.LastEvaluatedKey),

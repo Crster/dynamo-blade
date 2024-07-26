@@ -1,8 +1,8 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb/dist-types/DynamoDBClient";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
 export type Option = {
   tableName: string;
-  client: DynamoDBClient;
+  client: DynamoDBDocumentClient;
 };
 
 type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends <
