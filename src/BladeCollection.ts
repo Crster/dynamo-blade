@@ -8,7 +8,8 @@ import {
 import { decodeNext, buildItems, encodeNext, buildItem } from "./utils/index";
 import BladeOption from "./BladeOption";
 import BladeDocument from "./BladeDocument";
-import { SimpleFilter, Model } from "./BladeType";
+import { SimpleFilter, EntityField } from "./BladeType";
+import BladeFilter from "./BladeFilter";
 
 export default class BladeCollection<Schema> {
   private option: BladeOption;
@@ -26,7 +27,7 @@ export default class BladeCollection<Schema> {
     return this;
   }
 
-  async get<T extends Schema>(next?: string) {
+  async get<T extends EntityField<Schema>>(next?: string) {
     const { client, tableName, isUseIndex, getFieldName, getFieldValue } =
       this.option;
     const docClient = DynamoDBDocumentClient.from(client);
@@ -68,8 +69,8 @@ export default class BladeCollection<Schema> {
     }
   }
 
-  async getAll<T>(
-    collections: Array<T extends Model<Schema> ? T : Model<Schema>>,
+  async getAll<T extends keyof EntityField<Schema>>(
+    collections: Array<T>,
     key: string,
     next?: string
   ) {
@@ -112,7 +113,7 @@ export default class BladeCollection<Schema> {
     }
   }
 
-  addLater<T extends Schema>(key: string, value: Partial<T>) {
+  addLater<T extends EntityField<Schema>>(key: string, value: Partial<T>) {
     const { tableName, getFieldName, getFieldValue } = this.option.openKey(key);
 
     const command = new PutCommand({
@@ -129,7 +130,7 @@ export default class BladeCollection<Schema> {
     return command;
   }
 
-  async add<T extends Schema>(key: string, value: Partial<T>) {
+  async add<T extends EntityField<Schema>>(key: string, value: Partial<T>) {
     const command = this.addLater(key, value);
 
     const docClient = DynamoDBDocumentClient.from(this.option.client);
@@ -142,139 +143,15 @@ export default class BladeCollection<Schema> {
           err.message
         })`
       );
-      return false;
+      return null;
     }
   }
 
-  async where<T extends Schema>(
-    field: Model<T>,
+  where<F extends keyof EntityField<Schema>>(
+    field: F,
     condition: SimpleFilter,
-    value: T[typeof field],
-    next?: string
+    ...value: Array<EntityField<Schema>[F]>
   ) {
-    const {
-      client,
-      tableName,
-      collection,
-      isUseIndex,
-      getFieldName,
-      getFieldValue,
-    } = this.option;
-    const docClient = DynamoDBDocumentClient.from(client);
-
-    const filterExpression: Array<string> = [];
-    const keyConditionExpression: Array<string> = [];
-    const expressionAttributeNames = new Map<string, string>();
-    const expressionAttributeValues = new Map<string, T[typeof field]>();
-
-    const hashKey = isUseIndex()
-      ? getFieldName("HASH_INDEX")
-      : getFieldName("HASH");
-    const sortKey = isUseIndex()
-      ? getFieldName("SORT_INDEX")
-      : getFieldName("SORT");
-
-    const hashKeyValue = isUseIndex()
-      ? getFieldValue("HASH_INDEX")
-      : getFieldValue("HASH");
-
-    // Build Key Condition
-    keyConditionExpression.push(`${hashKey} = :hashKey`);
-    expressionAttributeValues.set(":hashKey", hashKeyValue as any);
-
-    // Build Filter Condition
-    if (field !== sortKey) {
-      if (!isUseIndex()) {
-        keyConditionExpression.push(`begins_with(${sortKey}, :sortKey)`);
-        expressionAttributeValues.set(":sortKey", collection as any);
-      }
-    }
-
-    const filterCondition =
-      field === sortKey ? keyConditionExpression : filterExpression;
-
-    switch (condition) {
-      case "=":
-        filterCondition.push(`#field = :value`);
-        expressionAttributeNames.set("#field", field as string);
-        expressionAttributeValues.set(":value", value);
-        break;
-      case "!=":
-        filterCondition.push(`#field <> :value`);
-        expressionAttributeNames.set("#field", field as string);
-        expressionAttributeValues.set(":value", value);
-        break;
-      case "<":
-        filterCondition.push(`#field < :value`);
-        expressionAttributeNames.set("#field", String(field));
-        expressionAttributeValues.set(":value", value);
-        break;
-      case "<=":
-        filterCondition.push(`#field <= :value`);
-        expressionAttributeNames.set("#field", String(field));
-        expressionAttributeValues.set(":value", value);
-        break;
-      case ">":
-        filterCondition.push(`#field > :value`);
-        expressionAttributeNames.set("#field", String(field));
-        expressionAttributeValues.set(":value", value);
-        break;
-      case ">=":
-        filterCondition.push(`#field >= :value`);
-        expressionAttributeNames.set("#field", String(field));
-        expressionAttributeValues.set(":value", value);
-        break;
-      case "BETWEEN":
-        if (Array.isArray(value) && value.length === 2) {
-          filterCondition.push(`#field BETWEEN :valueFrom AND :valueTo`);
-          expressionAttributeNames.set("#field", String(field));
-          expressionAttributeValues.set(":valueFrom", value.at(0));
-          expressionAttributeValues.set(":valueTo", value.at(1));
-        }
-        break;
-      case "IN":
-        if (Array.isArray(value)) {
-          const values: Array<any> = [];
-          value.forEach((val, index) => {
-            values.push(`:value${index}`);
-            expressionAttributeValues.set(`:value${index}`, val);
-          });
-
-          filterCondition.push(`#field IN (${values.join(",")})`);
-          expressionAttributeNames.set("#field", String(field));
-        }
-        break;
-      case "BEGINS_WITH":
-        filterCondition.push(`begins_with(#field, :value)`);
-        expressionAttributeNames.set("#field", String(field));
-        expressionAttributeValues.set(":value", value);
-        break;
-    }
-
-    const command = new QueryCommand({
-      TableName: tableName,
-      IndexName: isUseIndex() ? getFieldName("INDEX") : undefined,
-      KeyConditionExpression: keyConditionExpression.join(" AND "),
-      FilterExpression:
-        filterExpression.length > 0
-          ? filterExpression.join(" AND ")
-          : undefined,
-      ExpressionAttributeValues: Object.fromEntries(expressionAttributeValues),
-      ExpressionAttributeNames: Object.fromEntries(expressionAttributeNames),
-      ExclusiveStartKey: decodeNext(next),
-      ScanIndexForward: this.option.forwardScan,
-    });
-
-    try {
-      const result = await docClient.send(command);
-      return buildItems<T>(
-        result.Items,
-        encodeNext(result.LastEvaluatedKey),
-        this.option
-      );
-    } catch (err) {
-      console.warn(`Failed to get ${collection} (${err.message})`);
-      return buildItems<T>([], null, this.option);
-    }
+    return new BladeFilter<EntityField<Schema>>(this.option, field, condition, value);
   }
 }

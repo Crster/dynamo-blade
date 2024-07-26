@@ -10,7 +10,7 @@ import {
   TransactWriteCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 
-import { Option, Model, FieldType } from "./BladeType";
+import { Option, FieldType, Entity } from './BladeType';
 import BladeOption from "./BladeOption";
 import BladeCollection from "./BladeCollection";
 
@@ -25,8 +25,8 @@ export default class DynamoBlade<Schema> {
     this.option = new BladeOption(option);
   }
 
-  open<T>(collection: T extends Model<Schema> ? T : Model<Schema>) {
-    return new BladeCollection<Schema[typeof collection]>(
+  open<C extends keyof Entity<Schema>>(collection: C) {
+    return new BladeCollection<Schema[C]>(
       this.option.openCollection(collection)
     );
   }

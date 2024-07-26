@@ -8,7 +8,7 @@ import {
 
 import BladeOption from "./BladeOption";
 import BladeCollection from "./BladeCollection";
-import { ConditionDefination, Model, UpdateValue } from "./BladeType";
+import { ConditionDefination, Entity, EntityField, UpdateValue } from './BladeType';
 import { buildItem } from "./utils";
 
 export default class BladeDocument<Schema> {
@@ -18,8 +18,8 @@ export default class BladeDocument<Schema> {
     this.option = option;
   }
 
-  open<T>(collection: T extends Model<Schema> ? T : Model<Schema>) {
-    return new BladeCollection<Schema[typeof collection]>(
+  open<C extends keyof Entity<Schema>>(collection: C) {
+    return new BladeCollection<Schema[C]>(
       this.option.openCollection(collection)
     );
   }
@@ -28,7 +28,7 @@ export default class BladeDocument<Schema> {
     return this.option.getFieldValue("PRIMARY_KEY");
   }
 
-  async get<T extends Schema>(consistent?: boolean) {
+  async get<T extends EntityField<Schema>>(consistent?: boolean) {
     const { client, tableName, getFieldName, getFieldValue } = this.option;
 
     const command = new GetCommand({
@@ -53,7 +53,7 @@ export default class BladeDocument<Schema> {
     }
   }
 
-  validateLater<T extends Schema>(
+  validateLater<T extends EntityField<Schema>>(
     conditions: Array<ConditionDefination<keyof T>>
   ) {
     const { tableName, getFieldName, getFieldValue } = this.option;
@@ -243,7 +243,7 @@ export default class BladeDocument<Schema> {
     return command;
   }
 
-  setLater<T extends Schema>(
+  setLater<T extends EntityField<Schema>>(
     value: UpdateValue<T>,
     conditions?: Array<ConditionDefination<keyof T>>
   ) {
@@ -528,7 +528,7 @@ export default class BladeDocument<Schema> {
     return command;
   }
 
-  async set<T extends Schema>(
+  async set<T extends EntityField<Schema>>(
     values: UpdateValue<T>,
     conditions?: Array<ConditionDefination<keyof T>>
   ) {

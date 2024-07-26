@@ -3,13 +3,41 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb/dist-types/DynamoDBClie
 export type Option = {
   tableName: string;
   client: DynamoDBClient;
-  hashKey?: string;
-  sortKey?: string;
-  indexName?: string;
-  separator?: string;
 };
 
-export type Model<T> = keyof T;
+type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends <
+  T
+>() => T extends Y ? 1 : 2
+  ? A
+  : B;
+
+type WritableField<T> = {
+  [P in keyof T]-?: IfEquals<
+    { [Q in P]: T[P] },
+    { -readonly [Q in P]: T[P] },
+    P
+  >;
+}[keyof T];
+
+type ReadOnlyField<T> = {
+  [P in keyof T]-?: IfEquals<
+    { [Q in P]: T[P] },
+    { -readonly [Q in P]: T[P] },
+    never,
+    P
+  >;
+}[keyof T];
+
+export type Entity<T> = Pick<T, ReadOnlyField<T>>;
+
+export interface KeyField {
+  PK: string;
+  SK: string;
+  GS1PK: string;
+  GS1SK: string;
+}
+
+export type EntityField<T> = Pick<T, WritableField<T>> & KeyField;
 
 export type FieldType =
   | "HASH"
@@ -57,7 +85,7 @@ export type UpdateValue<T> =
   | { $delete: Partial<T> };
 
 export type ConditionDefination<T> = {
-  field: T;
+  field: "ANY" | T;
   condition: Condition;
   value?: any;
 };

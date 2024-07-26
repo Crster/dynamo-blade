@@ -1,11 +1,50 @@
-const { default: DynamoBlade } = require("./dist/index");
-const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+import DynamoBlade from "./src/index";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 
-const db = new DynamoBlade({
+interface Schema {
+  sample: string;
+
+  readonly artist: {
+    name: string;
+    alias: string;
+    age: number;
+    songCount: number;
+    collabs: Set<string>;
+
+    readonly album: {
+      year: number;
+      songCount: number;
+      hq: boolean;
+
+      readonly song: {
+        name: string;
+        title: string;
+        fever: number;
+        totalFever: number;
+        genre: "pop";
+        hasCollab: boolean;
+        collabs: Array<string>;
+        volumn: number;
+        year: number;
+        songCount: number;
+      };
+    };
+
+    readonly concert: {
+      price: number;
+      attendance: number;
+    };
+  };
+
+  readonly "artist:album": Schema["artist"]["album"];
+  readonly "artist:concert": Schema["artist"]["concert"];
+}
+
+const db = new DynamoBlade<Schema>({
   tableName: "testdb",
   client: new DynamoDBClient({
     region: "us-east-1",
-    // endpoint: "http://localhost:8000",
+    endpoint: "http://localhost:8000",
   }),
 });
 
@@ -248,7 +287,7 @@ test("update with condition", async () => {
       [
         {
           field: "ANY",
-          condition: "ATTRIBUTE_NOT_EXISTS"
+          condition: "ATTRIBUTE_NOT_EXISTS",
         },
       ]
     ),
@@ -262,7 +301,7 @@ test("update with condition", async () => {
       [
         {
           field: "ANY",
-          condition: "ATTRIBUTE_NOT_EXISTS"
+          condition: "ATTRIBUTE_NOT_EXISTS",
         },
       ]
     ),
@@ -300,23 +339,23 @@ test("add concert", async () => {
   const concertModel = db.open("artist").is("iyaz").open("concert");
 
   const commands = [
-    concertModel.addLater(new Date(2021, 0, 16).getTime(), {
+    concertModel.addLater(new Date(2021, 0, 16).getTime().toString(), {
       price: 200,
       attendance: 80,
     }),
-    concertModel.addLater(new Date(2021, 0, 9).getTime(), {
-      price: 200,
+    concertModel.addLater(new Date(2021, 0, 9).getTime().toString(), {
+      price: 2001,
       attendance: 100,
     }),
-    concertModel.addLater(new Date(2021, 0, 12).getTime(), {
-      price: 200,
+    concertModel.addLater(new Date(2021, 0, 12).getTime().toString(), {
+      price: 202,
       attendance: 100,
     }),
-    concertModel.addLater(new Date(2021, 0, 23).getTime(), {
+    concertModel.addLater(new Date(2021, 0, 23).getTime().toString(), {
       price: 200,
       attendance: 95,
     }),
-    concertModel.addLater(new Date(2021, 0, 19).getTime(), {
+    concertModel.addLater(new Date(2021, 0, 19).getTime().toString(), {
       price: 200,
       attendance: 88,
     }),
@@ -333,24 +372,30 @@ test("get all album", async () => {
   const result2 = await db.open("artist:album").tail().get();
   expect(result2.items.length).toBe(3);
 
-  const key = db.key(result2.items.at(0)[db.field("SORT")], "artist");
-  expect(key).toBe("iyaz");
+  const key = db.key(result2.items[0][db.field("SORT")], "artist");
+  expect(key).toBe("akon");
 });
 
 test("filter cache", async () => {
-  const result = await db.open("artist:album").where("year", ">", 2015);
-  expect(result.items.length).toBe(1);
-
-  const result2 = await db
+  const result = await db
     .open("artist:concert")
-    .where("GS1SK", "BETWEEN", [
-      `artist#iyaz:concert#${new Date(2021, 0, 10).getTime()}`,
-      db
-        .open("artist")
-        .is("iyaz")
-        .open("concert")
-        .is(new Date(2021, 0, 20).getTime())
-        .toString(),
-    ]);
-  expect(result2.items.length).toBe(3);
+    .where("GS1SK", "=", "1610985600000")
+    .get();
+  expect(result.items[0].SK).toBe("artist#iyaz:concert#1610985600000");
+
+  const result2 = await db.open("artist:album").where("year", ">", 2015).get();
+  expect(result2.items.length).toBe(1);
+
+  const result3 = await db
+    .open("artist:concert")
+    .where(
+      "GS1SK",
+      "BETWEEN",
+      new Date(2021, 0, 10).getTime().toString(),
+      new Date(2021, 0, 20).getTime().toString()
+    )
+    .where("attendance", "=", 100)
+    .get();
+
+  expect(result3.items[0].price).toBe(202);
 });
