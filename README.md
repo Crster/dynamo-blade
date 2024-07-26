@@ -7,13 +7,16 @@
 ```js
 import DynamoBlade from "@crster/dynamo-blade";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
 const db = new DynamoBlade({
   tableName: "simple",
-  client: new DynamoDBClient({
-    region: "local",
-    endpoint: "http://localhost:8000",
-  }),
+  client: DynamoDBDocumentClient.from(
+    new DynamoDBClient({
+      region: "us-east-1",
+      endpoint: "http://localhost:8000",
+    })
+  ),
 });
 ```
 
