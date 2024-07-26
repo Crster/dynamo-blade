@@ -58,7 +58,6 @@ export default class BladeFilter<Schema> {
 
     let counter = 0;
     for (const [field, condition, value] of this.filters) {
-      console.log(value)
       counter++;
 
       // Build Filter Condition

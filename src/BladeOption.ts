@@ -22,7 +22,7 @@ export default class BladeOption {
     this.indexName = "GS1";
     this.separator = "#";
     this.namespace = new Map();
-    this.forwardScan = true
+    this.forwardScan = true;
   }
 
   isUseIndex = () => {
@@ -111,13 +111,17 @@ export default class BladeOption {
           counter++;
         }
         break;
-      case "SORT_INDEX": // Get First and Last
+      case "SORT_INDEX": // Get all but not the last - 1
         for (const [key, value] of this.namespace.entries()) {
-          if (counter >= this.namespace.size) {
+          if (this.namespace.size == 1) {
+            ret.push(value ?? key)
+          } else if (counter < this.namespace.size - 1) {
+            ret.push(value ?? key);
+          } else if (counter >= this.namespace.size) {
             ret.push(value ?? key)
           }
 
-          counter++;
+          counter++
         }
         break;
       case "PRIMARY_KEY":
@@ -137,7 +141,7 @@ export default class BladeOption {
   openCollection = (name: any) => {
     const ret = new BladeOption({
       client: this.client,
-      tableName: this.tableName
+      tableName: this.tableName,
     });
 
     for (const [key, val] of this.namespace.entries()) {
@@ -154,7 +158,7 @@ export default class BladeOption {
   openKey = (key: any) => {
     const ret = new BladeOption({
       client: this.client,
-      tableName: this.tableName
+      tableName: this.tableName,
     });
 
     for (const [key, val] of this.namespace.entries()) {
