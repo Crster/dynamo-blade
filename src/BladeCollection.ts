@@ -1,5 +1,4 @@
 import {
-  DynamoDBDocumentClient,
   QueryCommand,
   PutCommand,
   QueryCommandInput,
@@ -8,7 +7,13 @@ import {
 import { decodeNext, buildItems, encodeNext, buildItem } from "./utils/index";
 import BladeOption from "./BladeOption";
 import BladeDocument from "./BladeDocument";
-import { SimpleFilter, EntityField } from "./BladeType";
+import {
+  ValueFilter,
+  Item,
+  CollectionName,
+  ItemSchema,
+  BladeItem,
+} from "./BladeType";
 import BladeFilter from "./BladeFilter";
 
 export default class BladeCollection<Schema> {
@@ -27,7 +32,7 @@ export default class BladeCollection<Schema> {
     return this;
   }
 
-  async get<T extends EntityField<Schema>>(next?: string) {
+  async get(next?: string) {
     const { client, tableName, isUseIndex, getFieldName, getFieldValue } =
       this.option;
 
@@ -54,8 +59,8 @@ export default class BladeCollection<Schema> {
     }
 
     try {
-      const result = await this.option.client.send(new QueryCommand(input));
-      return buildItems<T>(
+      const result = await client.send(new QueryCommand(input));
+      return buildItems<BladeItem<Schema>>(
         result.Items,
         encodeNext(result.LastEvaluatedKey),
         this.option
@@ -64,11 +69,11 @@ export default class BladeCollection<Schema> {
       console.warn(
         `Failed to get ${getFieldValue("PRIMARY_KEY")} (${err.message})`
       );
-      return buildItems<T>([], null, this.option);
+      return buildItems<BladeItem<Schema>>([], null, this.option);
     }
   }
 
-  async getAll<T extends keyof EntityField<Schema>>(
+  async load<T extends keyof CollectionName<Schema>>(
     collections: Array<T>,
     key: string,
     next?: string
@@ -87,17 +92,17 @@ export default class BladeCollection<Schema> {
     };
 
     try {
-      const result = await this.option.client.send(new QueryCommand(input));
-      const ret: Array<{ collection: T; data: any }> = [];
+      const result = await client.send(new QueryCommand(input));
+      const ret: Array<{ collection: T; data: Item<Schema> }> = [];
 
       for (const item of result.Items) {
         const sort: string = item[getFieldName("SORT")];
 
         const collectionName = sort.split(separator).at(0) as T;
-        if (collections.includes(collectionName as any)) {
+        if (collections.includes(collectionName)) {
           ret.push({
             collection: collectionName,
-            data: buildItem(item, this.option),
+            data: buildItem<BladeItem<Schema>>(item, this.option),
           });
         }
       }
@@ -111,7 +116,7 @@ export default class BladeCollection<Schema> {
     }
   }
 
-  addLater<T extends EntityField<Schema>>(key: string, value: Partial<T>) {
+  addLater(key: string, value: Item<Schema>) {
     const { tableName, getFieldName, getFieldValue } = this.option.openKey(key);
 
     const command = new PutCommand({
@@ -128,26 +133,32 @@ export default class BladeCollection<Schema> {
     return command;
   }
 
-  async add<T extends EntityField<Schema>>(key: string, value: Partial<T>) {
+  async add(key: string, value: Item<Schema>) {
     const command = this.addLater(key, value);
     try {
       const result = await this.option.client.send(command);
-      return result.$metadata.httpStatusCode === 200 ? key : null;
+      if (result.$metadata.httpStatusCode === 200) {
+        return buildItem<BladeItem<Schema>>(command.input.Item, this.option);
+      }
     } catch (err) {
       console.warn(
         `Failed to add ${this.option.getFieldValue("PRIMARY_KEY")} (${
           err.message
         })`
       );
-      return null;
     }
   }
 
-  where<F extends keyof EntityField<Schema>>(
+  where<F extends keyof ItemSchema<Schema>>(
     field: F,
-    condition: SimpleFilter,
-    ...value: Array<EntityField<Schema>[F]>
+    condition: ValueFilter,
+    value: ItemSchema<Schema>[F] | Array<ItemSchema<Schema>[F]>
   ) {
-    return new BladeFilter<EntityField<Schema>>(this.option, field, condition, value);
+    return new BladeFilter<Schema>(
+      this.option,
+      field,
+      condition,
+      Array.isArray(value) ? value : [value]
+    );
   }
 }

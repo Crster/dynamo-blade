@@ -1,5 +1,4 @@
 import {
-  DynamoDBDocumentClient,
   DeleteCommand,
   UpdateCommand,
   GetCommand,
@@ -8,8 +7,14 @@ import {
 
 import BladeOption from "./BladeOption";
 import BladeCollection from "./BladeCollection";
-import { ConditionDefination, Entity, EntityField, UpdateValue } from './BladeType';
-import { buildItem } from "./utils";
+import {
+  Condition,
+  CollectionName,
+  Item,
+  UpdateValue,
+  BladeItem,
+} from "./BladeType";
+import { buildCondition, buildItem } from "./utils";
 
 export default class BladeDocument<Schema> {
   private option: BladeOption;
@@ -18,7 +23,7 @@ export default class BladeDocument<Schema> {
     this.option = option;
   }
 
-  open<C extends keyof Entity<Schema>>(collection: C) {
+  open<C extends CollectionName<Schema>>(collection: C) {
     return new BladeCollection<Schema[C]>(
       this.option.openCollection(collection)
     );
@@ -28,7 +33,7 @@ export default class BladeDocument<Schema> {
     return this.option.getFieldValue("PRIMARY_KEY");
   }
 
-  async get<T extends EntityField<Schema>>(consistent?: boolean) {
+  async get(consistent?: boolean) {
     const { client, tableName, getFieldName, getFieldValue } = this.option;
 
     const command = new GetCommand({
@@ -42,7 +47,7 @@ export default class BladeDocument<Schema> {
 
     try {
       const result = await client.send(command);
-      return buildItem<T>(result.Item, this.option);
+      return buildItem<BladeItem<Schema>>(result.Item, this.option);
     } catch (err) {
       console.warn(
         `Failed to get ${getFieldValue("PRIMARY_KEY")} (${err.message})`
@@ -51,178 +56,18 @@ export default class BladeDocument<Schema> {
     }
   }
 
-  validateLater<T extends EntityField<Schema>>(
-    conditions: Array<ConditionDefination<keyof T>>
-  ) {
+  when(conditions: Array<Condition>) {
     const { tableName, getFieldName, getFieldValue } = this.option;
 
     const expressionAttributeName = new Map<string, string>();
     const expressionAttributeValues = new Map<string, any>();
 
     // Build Condition Expression
-    const updateConditions = [];
-
-    if (conditions && Array.isArray(conditions) && conditions.length > 0) {
-      for (let xx = 0; xx < conditions.length; xx++) {
-        const condition = conditions[xx];
-
-        switch (condition.condition) {
-          case "=":
-            updateConditions.push(`#conField${xx} = :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              condition.field as string
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "!=":
-            updateConditions.push(`#conField${xx} <> :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              condition.field as string
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "<":
-            updateConditions.push(`#conField${xx} < :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "<=":
-            updateConditions.push(`#conField${xx} <= :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case ">":
-            updateConditions.push(`#conField${xx} > :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case ">=":
-            updateConditions.push(`#conField${xx} >= :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "BETWEEN":
-            if (
-              Array.isArray(condition.value) &&
-              condition.value.length === 2
-            ) {
-              updateConditions.push(
-                `#conField${xx} BETWEEN :conValueFrom${xx} AND :conValueTo${xx}`
-              );
-              expressionAttributeName.set(
-                `#conField${xx}`,
-                String(condition.field)
-              );
-              expressionAttributeValues.set(
-                `:conValueFrom${xx}`,
-                condition.value.at(0)
-              );
-              expressionAttributeValues.set(
-                `:conValueTo${xx}`,
-                condition.value.at(1)
-              );
-            }
-            break;
-          case "IN":
-            if (Array.isArray(condition.value)) {
-              const values: Array<any> = [];
-              condition.value.forEach((val, index) => {
-                values.push(`:conValue${xx}${index}`);
-                expressionAttributeValues.set(`:conValue${xx}${index}`, val);
-              });
-
-              updateConditions.push(
-                `#conField${xx} IN (${condition.value.join(",")})`
-              );
-              expressionAttributeName.set(
-                `#conField${xx}`,
-                String(condition.field)
-              );
-            }
-            break;
-          case "BEGINS_WITH":
-            updateConditions.push(
-              `begins_with(#conField${xx}, :conValue${xx})`
-            );
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "ATTRIBUTE_EXISTS":
-            updateConditions.push(`attribute_exists(#conField${xx})`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            break;
-          case "ATTRIBUTE_NOT_EXISTS":
-            updateConditions.push(`attribute_not_exists(#conField${xx})`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            break;
-          case "ATTRIBUTE_TYPE":
-            updateConditions.push(
-              `attribute_type(#conField${xx}, :conValue${xx})`
-            );
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "CONTAINS":
-            updateConditions.push(`contains(#conField${xx}, :conValue${xx})`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "SIZE":
-            updateConditions.push(`size(#conField${xx}) = :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "SIZE_GT":
-            updateConditions.push(`size(#conField${xx}) < :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "SIZE_LT":
-            updateConditions.push(`size(#conField${xx}) > :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-        }
-      }
-    }
+    const filterExpression = buildCondition(
+      expressionAttributeName,
+      expressionAttributeValues,
+      conditions
+    );
 
     const command = new QueryCommand({
       TableName: tableName,
@@ -232,19 +77,13 @@ export default class BladeDocument<Schema> {
       },
       ExpressionAttributeNames: Object.fromEntries(expressionAttributeName),
       ExpressionAttributeValues: Object.fromEntries(expressionAttributeValues),
-      FilterExpression:
-        updateConditions.length > 0
-          ? updateConditions.join(" AND ")
-          : undefined,
+      FilterExpression: filterExpression,
     });
 
     return command;
   }
 
-  setLater<T extends EntityField<Schema>>(
-    value: UpdateValue<T>,
-    conditions?: Array<ConditionDefination<keyof T>>
-  ) {
+  setLater(value: UpdateValue<Item<Schema>>, conditions?: Array<Condition>) {
     const { tableName, getFieldName, getFieldValue } = this.option;
 
     const updateExpression: Array<string> = [];
@@ -344,169 +183,11 @@ export default class BladeDocument<Schema> {
     }
 
     // Build Condition Expression
-    const updateConditions = [];
-
-    if (conditions && Array.isArray(conditions) && conditions.length > 0) {
-      for (let xx = 0; xx < conditions.length; xx++) {
-        const condition = conditions[xx];
-
-        switch (condition.condition) {
-          case "=":
-            updateConditions.push(`#conField${xx} = :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              condition.field as string
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "!=":
-            updateConditions.push(`#conField${xx} <> :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              condition.field as string
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "<":
-            updateConditions.push(`#conField${xx} < :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "<=":
-            updateConditions.push(`#conField${xx} <= :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case ">":
-            updateConditions.push(`#conField${xx} > :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case ">=":
-            updateConditions.push(`#conField${xx} >= :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "BETWEEN":
-            if (
-              Array.isArray(condition.value) &&
-              condition.value.length === 2
-            ) {
-              updateConditions.push(
-                `#conField${xx} BETWEEN :conValueFrom${xx} AND :conValueTo${xx}`
-              );
-              expressionAttributeName.set(
-                `#conField${xx}`,
-                String(condition.field)
-              );
-              expressionAttributeValues.set(
-                `:conValueFrom${xx}`,
-                condition.value.at(0)
-              );
-              expressionAttributeValues.set(
-                `:conValueTo${xx}`,
-                condition.value.at(1)
-              );
-            }
-            break;
-          case "IN":
-            if (Array.isArray(condition.value)) {
-              const values: Array<any> = [];
-              condition.value.forEach((val, index) => {
-                values.push(`:conValue${xx}${index}`);
-                expressionAttributeValues.set(`:conValue${xx}${index}`, val);
-              });
-
-              updateConditions.push(
-                `#conField${xx} IN (${condition.value.join(",")})`
-              );
-              expressionAttributeName.set(
-                `#conField${xx}`,
-                String(condition.field)
-              );
-            }
-            break;
-          case "BEGINS_WITH":
-            updateConditions.push(
-              `begins_with(#conField${xx}, :conValue${xx})`
-            );
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "ATTRIBUTE_EXISTS":
-            updateConditions.push(`attribute_exists(#conField${xx})`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            break;
-          case "ATTRIBUTE_NOT_EXISTS":
-            updateConditions.push(`attribute_not_exists(#conField${xx})`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            break;
-          case "ATTRIBUTE_TYPE":
-            updateConditions.push(
-              `attribute_type(#conField${xx}, :conValue${xx})`
-            );
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "CONTAINS":
-            updateConditions.push(`contains(#conField${xx}, :conValue${xx})`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "SIZE":
-            updateConditions.push(`size(#conField${xx}) = :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "SIZE_GT":
-            updateConditions.push(`size(#conField${xx}) < :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-          case "SIZE_LT":
-            updateConditions.push(`size(#conField${xx}) > :conValue${xx}`);
-            expressionAttributeName.set(
-              `#conField${xx}`,
-              String(condition.field)
-            );
-            expressionAttributeValues.set(`:conValue${xx}`, condition.value);
-            break;
-        }
-      }
-    }
+    const conditionExpression = buildCondition(
+      expressionAttributeName,
+      expressionAttributeValues,
+      conditions
+    );
 
     const command = new UpdateCommand({
       TableName: tableName,
@@ -517,20 +198,14 @@ export default class BladeDocument<Schema> {
       UpdateExpression: updateExpression.join("\n"),
       ExpressionAttributeNames: Object.fromEntries(expressionAttributeName),
       ExpressionAttributeValues: Object.fromEntries(expressionAttributeValues),
-      ConditionExpression:
-        updateConditions.length > 0
-          ? updateConditions.join(" AND ")
-          : undefined,
+      ConditionExpression: conditionExpression,
     });
 
     return command;
   }
 
-  async set<T extends EntityField<Schema>>(
-    values: UpdateValue<T>,
-    conditions?: Array<ConditionDefination<keyof T>>
-  ) {
-    const command = this.setLater(values, conditions);
+  async set(value: UpdateValue<Item<Schema>>, conditions?: Array<Condition>) {
+    const command = this.setLater(value, conditions);
 
     try {
       const result = await this.option.client.send(command);

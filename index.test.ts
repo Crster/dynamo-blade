@@ -2,33 +2,31 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import DynamoBlade from "./src/index";
 
-
 interface Schema {
   sample: string;
 
   readonly artist: {
     name: string;
-    alias: string;
-    age: number;
-    songCount: number;
-    collabs: Set<string>;
+    alias?: string;
+    age?: number;
+    songCount?: number;
+    collabs?: Set<string>;
 
     readonly album: {
       year: number;
       songCount: number;
-      hq: boolean;
 
       readonly song: {
-        name: string;
-        title: string;
-        fever: number;
-        totalFever: number;
-        genre: "pop";
-        hasCollab: boolean;
-        collabs: Array<string>;
-        volumn: number;
-        year: number;
-        songCount: number;
+        name?: string;
+        title?: string;
+        fever?: number;
+        totalFever?: number;
+        genre?: "pop";
+        hasCollab?: boolean;
+        collabs?: Array<string>;
+        volumn?: number;
+        year?: number;
+        songCount?: number;
       };
     };
 
@@ -64,7 +62,7 @@ test("test add artist", async () => {
     age: 40,
   });
 
-  expect(result1).toBe("akon");
+  expect(result1?.PK).toBe("akon");
 
   const result2 = await db.open("artist").add("iyaz", {
     name: "Keidran Jones",
@@ -73,13 +71,13 @@ test("test add artist", async () => {
     collabs: new Set(["akon", "madonna", "charice"]),
   });
 
-  expect(result2).toBe("iyaz");
+  expect(result2?.PK).toBe("iyaz");
 
   const result3 = await db.open("artist").add("charice", {
     name: db.open("artist").is("charice").toString(),
   });
 
-  expect(result3).toBe("charice");
+  expect(result3?.PK).toBe("charice");
 });
 
 test("get artist by key", async () => {
@@ -151,7 +149,7 @@ test("add album", async () => {
       songCount: 9,
     });
 
-  expect(result).toBe("trouble");
+  expect(result?.PK).toBe("trouble");
 
   const result2 = await db
     .open("artist")
@@ -162,7 +160,7 @@ test("add album", async () => {
       songCount: 10,
     });
 
-  expect(result2).toBe("akonda");
+  expect(result2?.PK).toBe("akonda");
 
   const result3 = await db
     .open("artist")
@@ -173,7 +171,7 @@ test("add album", async () => {
       songCount: 12,
     });
 
-  expect(result3).toBe("replay");
+  expect(result3?.PK).toBe("replay");
 });
 
 test("add song", async () => {
@@ -292,7 +290,7 @@ test("update with condition", async () => {
         {
           field: "ANY",
           condition: "ATTRIBUTE_NOT_EXISTS",
-        },
+        }
       ]
     ),
     troubleSong.is("song6").setLater(
@@ -327,7 +325,7 @@ test("conditional transaction", async () => {
       year: 2015,
       songCount: 55,
     }),
-    troubleSong.is("song3").validateLater([
+    troubleSong.is("song3").when([
       {
         field: "fever",
         condition: "BETWEEN",
@@ -392,12 +390,10 @@ test("filter cache", async () => {
 
   const result3 = await db
     .open("artist:concert")
-    .where(
-      "GS1SK",
-      "BETWEEN",
+    .where("GS1SK", "BETWEEN", [
       new Date(2021, 0, 10).getTime().toString(),
-      new Date(2021, 0, 20).getTime().toString()
-    )
+      new Date(2021, 0, 20).getTime().toString(),
+    ])
     .where("attendance", "=", 100)
     .get();
 

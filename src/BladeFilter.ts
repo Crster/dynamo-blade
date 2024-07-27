@@ -1,28 +1,28 @@
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import BladeOption from "./BladeOption";
-import { SimpleFilter } from "./BladeType";
+import { ItemSchema, ValueFilter, Item, BladeItem } from './BladeType';
 import { buildItems, decodeNext, encodeNext } from "./utils";
 
 export default class BladeFilter<Schema> {
   private option: BladeOption;
-  private filters: Array<[any, SimpleFilter, ...any]>;
+  private filters: Array<[any, ValueFilter, ...any]>;
 
   constructor(
     option: BladeOption,
     field: any,
-    condition: SimpleFilter,
+    condition: ValueFilter,
     value: Array<any>
   ) {
     this.option = option;
     this.filters = [[field, condition, value]];
   }
 
-  where<F extends keyof Schema>(
+  where<F extends keyof ItemSchema<Schema>>(
     field: F,
-    condition: SimpleFilter,
-    ...value: Array<Schema[F]>
+    condition: ValueFilter,
+    value: ItemSchema<Schema>[F] | Array<ItemSchema<Schema>[F]>
   ) {
-    this.filters.push([field, condition, value]);
+    this.filters.push([field, condition, Array.isArray(value) ? value : [value]]);
     return this;
   }
 
@@ -153,14 +153,14 @@ export default class BladeFilter<Schema> {
       });
 
       const result = await client.send(command);
-      return buildItems<Schema>(
+      return buildItems<BladeItem<Schema>>(
         result.Items,
         encodeNext(result.LastEvaluatedKey),
         this.option
       );
     } catch (err) {
       console.warn(`Failed to get ${collection} (${err.message})`);
-      return buildItems<Schema>([], null, this.option);
+      return buildItems<BladeItem<Schema>>([], null, this.option);
     }
   }
 }

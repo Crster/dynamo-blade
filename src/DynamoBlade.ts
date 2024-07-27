@@ -9,7 +9,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { BillingMode, CreateTableCommand } from "@aws-sdk/client-dynamodb";
 
-import { Option, FieldType, Entity } from "./BladeType";
+import { Option, FieldType, CollectionName } from "./BladeType";
 import BladeOption from "./BladeOption";
 import BladeCollection from "./BladeCollection";
 
@@ -24,7 +24,7 @@ export default class DynamoBlade<Schema> {
     this.option = new BladeOption(option);
   }
 
-  open<C extends keyof Entity<Schema>>(collection: C) {
+  open<C extends CollectionName<Schema>>(collection: C) {
     return new BladeCollection<Schema[C]>(
       this.option.openCollection(collection)
     );

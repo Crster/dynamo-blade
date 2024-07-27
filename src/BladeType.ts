@@ -28,16 +28,18 @@ type ReadOnlyField<T> = {
   >;
 }[keyof T];
 
-export type Entity<T> = Pick<T, ReadOnlyField<T>>;
+export type CollectionName<T> = keyof Pick<T, ReadOnlyField<T>>;
 
-export interface KeyField {
+export type Item<T> = Pick<T, WritableField<T>>;
+
+export type ItemSchema<T> = Pick<T, WritableField<T>> & {
   PK: string;
   SK: string;
   GS1PK: string;
   GS1SK: string;
-}
+};
 
-export type EntityField<T> = Pick<T, WritableField<T>> & KeyField;
+export type BladeItem<T> = Pick<T, WritableField<T>> & { PK: string; SK?: string }
 
 export type FieldType =
   | "HASH"
@@ -49,7 +51,7 @@ export type FieldType =
 
 export type BillingMode = "PROVISIONED" | "PAY_PER_REQUEST";
 
-export type SimpleFilter =
+export type ValueFilter =
   | "="
   | "!="
   | ">"
@@ -60,7 +62,7 @@ export type SimpleFilter =
   | "BEGINS_WITH"
   | "IN";
 
-export type ExtraFilter =
+export type DataFilter =
   | "ATTRIBUTE_EXISTS"
   | "ATTRIBUTE_NOT_EXISTS"
   | "ATTRIBUTE_TYPE"
@@ -69,11 +71,9 @@ export type ExtraFilter =
   | "SIZE_GT"
   | "SIZE_LT";
 
-export type Condition = SimpleFilter | ExtraFilter;
-
 export type QueryResult<T> = { items: Array<T>; next?: string };
 
-export type RemoveValue<T> = {
+export type RemoveField<T> = {
   [P in keyof T]?: boolean;
 };
 
@@ -81,11 +81,11 @@ export type UpdateValue<T> =
   | Partial<T>
   | { $add: Partial<T> }
   | { $set: Partial<T> }
-  | { $remove: RemoveValue<T> }
+  | { $remove: RemoveField<T> }
   | { $delete: Partial<T> };
 
-export type ConditionDefination<T> = {
-  field: "ANY" | T;
-  condition: Condition;
+export type Condition = {
+  field: string;
+  condition: ValueFilter | DataFilter;
   value?: any;
 };
