@@ -89,6 +89,11 @@ test("get artist by key", async () => {
   expect(result2).toHaveProperty("SK", "artist#akon");
 });
 
+test("get artist data", async () => {
+  const result = await db.open("artist").is("iyaz").getWith(["album", "concert"])
+  expect(result?.items.length).toBe(7)
+})
+
 test("update artist age", async () => {
   const result1 = await db
     .open("artist")

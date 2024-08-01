@@ -3,6 +3,7 @@ import {
   UpdateCommand,
   GetCommand,
   QueryCommand,
+  QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 
 import BladeOption from "./BladeOption";
@@ -14,7 +15,13 @@ import {
   UpdateValue,
   BladeItem,
 } from "./BladeType";
-import { buildCondition, buildItem } from "./utils";
+import {
+  buildCondition,
+  buildItem,
+  buildItems,
+  decodeNext,
+  encodeNext,
+} from "./utils";
 
 export default class BladeDocument<Schema> {
   private option: BladeOption;
@@ -48,6 +55,60 @@ export default class BladeDocument<Schema> {
     try {
       const result = await client.send(command);
       return buildItem<BladeItem<Schema>>(result.Item, this.option);
+    } catch (err) {
+      console.warn(
+        `Failed to get ${getFieldValue("PRIMARY_KEY")} (${err.message})`
+      );
+      return null;
+    }
+  }
+
+  async getWith<T extends CollectionName<Schema>>(
+    collections: Array<T>,
+    next?: string
+  ) {
+    const { client, tableName, separator, getFieldName, getFieldValue } =
+      this.option;
+
+    const filterConditionExpression = collections.map(
+      (value, index) => `${getFieldName("HASH_INDEX")} = :sortIndex${index}`
+    );
+    const filterConditionValues = collections.reduce((prev, curr, index) => {
+      prev[`:sortIndex${index}`] = `${getFieldValue("HASH_INDEX")}:${String(
+        curr
+      )}`;
+      return prev;
+    }, {});
+
+    if (collections.length) {
+      filterConditionExpression.push(
+        `${getFieldName("HASH_INDEX")} = :sortIndex${collections.length}`
+      );
+      filterConditionValues[`:sortIndex${collections.length}`] =
+        getFieldValue("HASH_INDEX");
+    }
+
+    const input: QueryCommandInput = {
+      TableName: tableName,
+      KeyConditionExpression: `${getFieldName("HASH")} = :hashKey`,
+      ExpressionAttributeValues: {
+        ":hashKey": getFieldValue("PRIMARY_KEY"),
+        ...filterConditionValues,
+      },
+      FilterExpression: filterConditionExpression.length
+        ? filterConditionExpression.join(" OR ")
+        : undefined,
+      ExclusiveStartKey: decodeNext(next),
+      ScanIndexForward: this.option.forwardScan,
+    };
+
+    try {
+      const result = await client.send(new QueryCommand(input));
+      return buildItems<BladeItem<Schema>>(
+        result.Items,
+        encodeNext(result.LastEvaluatedKey),
+        this.option
+      );
     } catch (err) {
       console.warn(
         `Failed to get ${getFieldValue("PRIMARY_KEY")} (${err.message})`

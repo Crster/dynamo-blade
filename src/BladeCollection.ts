@@ -10,7 +10,6 @@ import BladeDocument from "./BladeDocument";
 import {
   ValueFilter,
   Item,
-  CollectionName,
   ItemSchema,
   BladeItem,
 } from "./BladeType";
@@ -70,49 +69,6 @@ export default class BladeCollection<Schema> {
         `Failed to get ${getFieldValue("PRIMARY_KEY")} (${err.message})`
       );
       return buildItems<BladeItem<Schema>>([], null, this.option);
-    }
-  }
-
-  async load<T extends keyof CollectionName<Schema>>(
-    collections: Array<T>,
-    key: string,
-    next?: string
-  ) {
-    const { client, tableName, separator, getFieldName, getFieldValue } =
-      this.option.openKey(key);
-
-    const input: QueryCommandInput = {
-      TableName: tableName,
-      KeyConditionExpression: `${getFieldName("HASH")} = :hashKey`,
-      ExpressionAttributeValues: {
-        ":hashKey": getFieldValue("PRIMARY_KEY"),
-      },
-      ExclusiveStartKey: decodeNext(next),
-      ScanIndexForward: this.option.forwardScan,
-    };
-
-    try {
-      const result = await client.send(new QueryCommand(input));
-      const ret: Array<{ collection: T; data: Item<Schema> }> = [];
-
-      for (const item of result.Items) {
-        const sort: string = item[getFieldName("SORT")];
-
-        const collectionName = sort.split(separator).at(0) as T;
-        if (collections.includes(collectionName)) {
-          ret.push({
-            collection: collectionName,
-            data: buildItem<BladeItem<Schema>>(item, this.option),
-          });
-        }
-      }
-
-      return ret;
-    } catch (err) {
-      console.warn(
-        `Failed to get ${getFieldValue("PRIMARY_KEY")} (${err.message})`
-      );
-      return null;
     }
   }
 
