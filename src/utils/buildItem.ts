@@ -11,7 +11,11 @@ export default function buildItem<T>(
       if (key === option.getFieldName("HASH")) {
         ret.set(key, option.getKey(value[option.getFieldName("SORT")]));
       } else if (key === option.getFieldName("SORT")) {
-        ret.set(key, value[option.getFieldName("HASH_INDEX")])
+        if (value[option.getFieldName("HASH")] === value[option.getFieldName("SORT")]) {
+          ret.set(key, value[option.getFieldName("HASH")])
+        } else {
+          ret.set(key, value[option.getFieldName("HASH")] + ":" + value[option.getFieldName("SORT")])
+        }
       } else if (key === option.getFieldName("HASH_INDEX")) {
         // Not implemented
       } else if (key === option.getFieldName("SORT_INDEX")) {
