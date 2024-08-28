@@ -1,17 +1,16 @@
 import BladeOption from "../BladeOption";
-import { QueryResult } from "../BladeType";
+import { BladeItem, Option, QueryResult } from "../BladeType";
 import buildItem from "./buildItem";
 
-export default function buildItems<T>(
-  values: Array<Record<string, any>>,
-  next: string,
-  option: BladeOption
-) {
-  const ret: QueryResult<T> = { items: [] };
+export default function buildItems<
+  Opt extends Option,
+  Collection extends keyof Opt["schema"]
+>(values: Array<Record<string, any>>, next: string, option: BladeOption<Opt>) {
+  const ret: QueryResult<BladeItem<Opt, Collection>> = { items: [] };
 
   if (values && Array.isArray(values) && values.length > 0) {
     for (const value of values) {
-      ret.items.push(buildItem<T>(value, option));
+      ret.items.push(buildItem<Opt, Collection>(value, option));
     }
 
     if (next) {

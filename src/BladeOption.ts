@@ -1,7 +1,7 @@
 import { FieldType, Option } from "./BladeType";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
-export default class BladeOption {
+export default class BladeOption<Opt extends Option> {
   private hashKey: string;
   private sortKey: string;
   private indexName: string;
@@ -14,7 +14,7 @@ export default class BladeOption {
   public forwardScan: boolean;
   public client: DynamoDBDocumentClient;
 
-  constructor(option: Option) {
+  constructor(option: Opt) {
     this.client = option.client;
     this.tableName = option.tableName;
     this.hashKey = "PK";
@@ -139,10 +139,10 @@ export default class BladeOption {
   };
 
   openCollection = (name: any) => {
-    const ret = new BladeOption({
+    const ret = new BladeOption<Opt>({
       client: this.client,
       tableName: this.tableName,
-    });
+    } as Opt);
 
     for (const [key, val] of this.namespace.entries()) {
       ret.namespace.set(key, val);
@@ -156,10 +156,10 @@ export default class BladeOption {
   };
 
   openKey = (key: any) => {
-    const ret = new BladeOption({
+    const ret = new BladeOption<Opt>({
       client: this.client,
       tableName: this.tableName,
-    });
+    } as Opt);
 
     for (const [key, val] of this.namespace.entries()) {
       ret.namespace.set(key, val);

@@ -9,21 +9,20 @@ import BladeOption from "./BladeOption";
 import BladeDocument from "./BladeDocument";
 import {
   ValueFilter,
-  Item,
-  ItemSchema,
   BladeItem,
+  Option,
 } from "./BladeType";
 import BladeFilter from "./BladeFilter";
 
-export default class BladeCollection<Schema> {
-  private option: BladeOption;
+export default class BladeCollection<Opt extends Option, Collection extends keyof Opt["schema"]> {
+  private option: BladeOption<Opt>;
 
-  constructor(option: BladeOption) {
+  constructor(option: BladeOption<Opt>) {
     this.option = option;
   }
 
   is(key: string) {
-    return new BladeDocument<Schema>(this.option.openKey(key));
+    return new BladeDocument<Opt, Collection>(this.option.openKey(key));
   }
 
   tail() {
@@ -59,7 +58,7 @@ export default class BladeCollection<Schema> {
 
     try {
       const result = await client.send(new QueryCommand(input));
-      return buildItems<BladeItem<Schema>>(
+      return buildItems<Opt, Collection>(
         result.Items,
         encodeNext(result.LastEvaluatedKey),
         this.option
@@ -68,11 +67,11 @@ export default class BladeCollection<Schema> {
       console.warn(
         `Failed to get ${getFieldValue("PRIMARY_KEY")} (${err.message})`
       );
-      return buildItems<BladeItem<Schema>>([], null, this.option);
+      return buildItems<Opt, Collection>([], null, this.option);
     }
   }
 
-  addLater(key: string, value: Item<Schema>) {
+  addLater(key: string, value: BladeItem<Opt, Collection>) {
     const { tableName, getFieldName, getFieldValue } = this.option.openKey(key);
 
     const command = new PutCommand({
@@ -89,12 +88,12 @@ export default class BladeCollection<Schema> {
     return command;
   }
 
-  async add(key: string, value: Item<Schema>) {
+  async add(key: string, value: BladeItem<Opt, Collection>) {
     const command = this.addLater(key, value);
     try {
       const result = await this.option.client.send(command);
       if (result.$metadata.httpStatusCode === 200) {
-        return buildItem<BladeItem<Schema>>(command.input.Item, this.option);
+        return buildItem<Opt, Collection>(command.input.Item, this.option);
       }
     } catch (err) {
       console.warn(
@@ -105,12 +104,12 @@ export default class BladeCollection<Schema> {
     }
   }
 
-  where<F extends keyof ItemSchema<Schema>>(
+  where<F extends keyof BladeItem<Opt, Collection>>(
     field: F,
     condition: ValueFilter,
-    value: ItemSchema<Schema>[F] | Array<ItemSchema<Schema>[F]>
+    value: BladeItem<Opt, Collection>[F] | Array<BladeItem<Opt, Collection>[F]>
   ) {
-    return new BladeFilter<Schema>(
+    return new BladeFilter<Opt, Collection>(
       this.option,
       field,
       condition,

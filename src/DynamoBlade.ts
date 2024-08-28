@@ -13,19 +13,19 @@ import { Option, FieldType, CollectionName } from "./BladeType";
 import BladeOption from "./BladeOption";
 import BladeCollection from "./BladeCollection";
 
-export default class DynamoBlade<Schema> {
-  public option: BladeOption;
+export default class DynamoBlade<Opt extends Option> {
+  public option: BladeOption<Opt>;
 
-  constructor(option: Option) {
+  constructor(option: Opt) {
     if (!option) throw new Error("Option is required");
     if (!option.tableName) throw new Error("option.tableName is required");
     if (!option.client) throw new Error("option.client is required");
 
-    this.option = new BladeOption(option);
+    this.option = new BladeOption<Opt>(option);
   }
 
-  open<C extends CollectionName<Schema>>(collection: C) {
-    return new BladeCollection<Schema[C]>(
+  open<C extends CollectionName<Opt>>(collection: C) {
+    return new BladeCollection<Opt, C>(
       this.option.openCollection(collection)
     );
   }

@@ -1,8 +1,9 @@
 import BladeOption from "../BladeOption";
+import { Option } from "../BladeType";
 
-export default function buildItem<T>(
+export default function buildItem<Opt extends Option, Collection extends keyof Opt["schema"]>(
   value: Record<string, any>,
-  option: BladeOption
+  option: BladeOption<Opt>
 ) {
   if (value) {
     const ret = new Map<string, any>();
@@ -25,7 +26,7 @@ export default function buildItem<T>(
       }
     }
 
-    return Object.fromEntries(ret) as T;
+    return Object.fromEntries(ret) as Opt["schema"][Collection];
   } else {
     return null;
   }

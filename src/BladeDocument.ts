@@ -11,9 +11,9 @@ import BladeCollection from "./BladeCollection";
 import {
   Condition,
   CollectionName,
-  Item,
   UpdateValue,
   BladeItem,
+  Option,
 } from "./BladeType";
 import {
   buildCondition,
@@ -23,15 +23,18 @@ import {
   encodeNext,
 } from "./utils";
 
-export default class BladeDocument<Schema> {
-  private option: BladeOption;
+export default class BladeDocument<
+  Opt extends Option,
+  Collection extends keyof Opt["schema"]
+> {
+  private option: BladeOption<Opt>;
 
-  constructor(option: BladeOption) {
+  constructor(option: BladeOption<Opt>) {
     this.option = option;
   }
 
-  open<C extends CollectionName<Schema>>(collection: C) {
-    return new BladeCollection<Schema[C]>(
+  open<C extends CollectionName<Opt>>(collection: C) {
+    return new BladeCollection<Opt, Collection>(
       this.option.openCollection(collection)
     );
   }
@@ -54,7 +57,7 @@ export default class BladeDocument<Schema> {
 
     try {
       const result = await client.send(command);
-      return buildItem<BladeItem<Schema>>(result.Item, this.option);
+      return buildItem<Opt, Collection>(result.Item, this.option);
     } catch (err) {
       console.warn(
         `Failed to get ${getFieldValue("PRIMARY_KEY")} (${err.message})`
@@ -63,7 +66,7 @@ export default class BladeDocument<Schema> {
     }
   }
 
-  async getWith<T extends CollectionName<Schema>>(
+  async getWith<T extends CollectionName<Opt>>(
     collections: Array<T>,
     next?: string
   ) {
@@ -104,7 +107,7 @@ export default class BladeDocument<Schema> {
 
     try {
       const result = await client.send(new QueryCommand(input));
-      return buildItems<BladeItem<Schema>>(
+      return buildItems<Opt, Collection>(
         result.Items,
         encodeNext(result.LastEvaluatedKey),
         this.option
@@ -144,7 +147,10 @@ export default class BladeDocument<Schema> {
     return command;
   }
 
-  setLater(value: UpdateValue<Item<Schema>>, conditions?: Array<Condition>) {
+  setLater(
+    value: UpdateValue<BladeItem<Opt, Collection>>,
+    conditions?: Array<Condition>
+  ) {
     const { tableName, getFieldName, getFieldValue } = this.option;
 
     const updateExpression: Array<string> = [];
@@ -265,7 +271,10 @@ export default class BladeDocument<Schema> {
     return command;
   }
 
-  async set(value: UpdateValue<Item<Schema>>, conditions?: Array<Condition>) {
+  async set(
+    value: UpdateValue<BladeItem<Opt, Collection>>,
+    conditions?: Array<Condition>
+  ) {
     const command = this.setLater(value, conditions);
 
     try {

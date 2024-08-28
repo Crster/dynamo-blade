@@ -1,14 +1,17 @@
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import BladeOption from "./BladeOption";
-import { ItemSchema, ValueFilter, Item, BladeItem } from './BladeType';
+import { ValueFilter, BladeItem, Option } from "./BladeType";
 import { buildItems, decodeNext, encodeNext } from "./utils";
 
-export default class BladeFilter<Schema> {
-  private option: BladeOption;
+export default class BladeFilter<
+  Opt extends Option,
+  Collection extends keyof Opt["schema"]
+> {
+  private option: BladeOption<Opt>;
   private filters: Array<[any, ValueFilter, ...any]>;
 
   constructor(
-    option: BladeOption,
+    option: BladeOption<Opt>,
     field: any,
     condition: ValueFilter,
     value: Array<any>
@@ -17,12 +20,16 @@ export default class BladeFilter<Schema> {
     this.filters = [[field, condition, value]];
   }
 
-  where<F extends keyof ItemSchema<Schema>>(
+  where<F extends keyof BladeItem<Opt, Collection>>(
     field: F,
     condition: ValueFilter,
-    value: ItemSchema<Schema>[F] | Array<ItemSchema<Schema>[F]>
+    value: BladeItem<Opt, Collection>[F] | Array<BladeItem<Opt, Collection>[F]>
   ) {
-    this.filters.push([field, condition, Array.isArray(value) ? value : [value]]);
+    this.filters.push([
+      field,
+      condition,
+      Array.isArray(value) ? value : [value],
+    ]);
     return this;
   }
 
@@ -108,22 +115,22 @@ export default class BladeFilter<Schema> {
           expressionAttributeValues.set(`:value${counter}`, value.at(0));
           break;
         case "BETWEEN":
-            filterCondition.push(
-              `#field${counter} BETWEEN :valueFrom${counter} AND :valueTo${counter}`
-            );
-            expressionAttributeNames.set(`#field${counter}`, field);
-            expressionAttributeValues.set(`:valueFrom${counter}`, value.at(0));
-            expressionAttributeValues.set(`:valueTo${counter}`, value.at(1));
+          filterCondition.push(
+            `#field${counter} BETWEEN :valueFrom${counter} AND :valueTo${counter}`
+          );
+          expressionAttributeNames.set(`#field${counter}`, field);
+          expressionAttributeValues.set(`:valueFrom${counter}`, value.at(0));
+          expressionAttributeValues.set(`:valueTo${counter}`, value.at(1));
           break;
         case "IN":
-            const values: Array<any> = [];
-            value.forEach((val, index) => {
-              values.push(`:value${index}`);
-              expressionAttributeValues.set(`:value${index}`, val);
-            });
+          const values: Array<any> = [];
+          value.forEach((val, index) => {
+            values.push(`:value${index}`);
+            expressionAttributeValues.set(`:value${index}`, val);
+          });
 
-            filterCondition.push(`#field${counter} IN (${values.join(",")})`);
-            expressionAttributeNames.set(`#field${counter}`, field);
+          filterCondition.push(`#field${counter} IN (${values.join(",")})`);
+          expressionAttributeNames.set(`#field${counter}`, field);
           break;
         case "BEGINS_WITH":
           filterCondition.push(
@@ -153,14 +160,14 @@ export default class BladeFilter<Schema> {
       });
 
       const result = await client.send(command);
-      return buildItems<BladeItem<Schema>>(
+      return buildItems<Opt, Collection>(
         result.Items,
         encodeNext(result.LastEvaluatedKey),
         this.option
       );
     } catch (err) {
       console.warn(`Failed to get ${collection} (${err.message})`);
-      return buildItems<BladeItem<Schema>>([], null, this.option);
+      return buildItems<Opt, Collection>([], null, this.option);
     }
   }
 }

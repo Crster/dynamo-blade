@@ -1,45 +1,18 @@
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import BladeSchema from "./BladeSchema";
 
 export type Option = {
   tableName: string;
   client: DynamoDBDocumentClient;
+  schema: Record<string, ReturnType<typeof BladeSchema<any>>>;
 };
 
-type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends <
-  T
->() => T extends Y ? 1 : 2
-  ? A
-  : B;
+export type CollectionName<Opt extends Option> = keyof Opt["schema"];
 
-type WritableField<T> = {
-  [P in keyof T]-?: IfEquals<
-    { [Q in P]: T[P] },
-    { -readonly [Q in P]: T[P] },
-    P
-  >;
-}[keyof T];
-
-type ReadOnlyField<T> = {
-  [P in keyof T]-?: IfEquals<
-    { [Q in P]: T[P] },
-    { -readonly [Q in P]: T[P] },
-    never,
-    P
-  >;
-}[keyof T];
-
-export type CollectionName<T> = keyof Pick<T, ReadOnlyField<T>>;
-
-export type Item<T> = Pick<T, WritableField<T>>;
-
-export type ItemSchema<T> = Pick<T, WritableField<T>> & {
-  PK: string;
-  SK: string;
-  GS1PK: string;
-  GS1SK: string;
-};
-
-export type BladeItem<T> = Pick<T, WritableField<T>> & { PK: string; SK?: string }
+export type BladeItem<
+  Opt extends Option,
+  Collection extends keyof Opt["schema"]
+> = Opt["schema"][Collection];
 
 export type FieldType =
   | "HASH"
