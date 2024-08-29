@@ -1,4 +1,4 @@
-import { SchemaDefinition, SchemaType } from "./BladeType";
+import { Option, SchemaDefinition, SchemaType } from "./BladeType";
 
 interface BladeSchemaParam<
   Schema extends Record<string, SchemaType | SchemaDefinition>,
@@ -52,7 +52,40 @@ export default class BladeSchema<
     }
   }
 
-  buildItem<T extends Record<string, any>>(data: any): T | undefined {
+  getKey<T extends Record<string, any>>(option: Option, data: any) {
+    if (data) {
+      const ret = {}
+      const value = this.getItem(data);
+
+      if (this.hashKey) {
+        if (option.primaryKey.hashKey[1] instanceof Number) {
+          ret[option.primaryKey.hashKey[0]] = Number(this.hashKey(value as Schema))
+        } if (option.primaryKey.hashKey[1] instanceof Boolean) {
+          ret[option.primaryKey.hashKey[0]] = this.hashKey(value as Schema) ? "true" : "false"
+        } if (option.primaryKey.hashKey[1] instanceof Date) {
+          ret[option.primaryKey.hashKey[0]] = new Date(this.hashKey(value as Schema)).toISOString()
+        } else {
+          ret[option.primaryKey.hashKey[0]] = String(this.hashKey(value as Schema))
+        }
+      }
+
+      if (this.sortKey && option.primaryKey.sortKey) {
+        if (option.primaryKey.sortKey[1] instanceof Number) {
+          ret[option.primaryKey.sortKey[0]] = Number(this.sortKey(value as Schema))
+        } if (option.primaryKey.sortKey[1] instanceof Boolean) {
+          ret[option.primaryKey.sortKey[0]] = this.sortKey(value as Schema) ? "true" : "false"
+        } if (option.primaryKey.sortKey[1] instanceof Date) {
+          ret[option.primaryKey.sortKey[0]] = new Date(this.sortKey(value as Schema)).toISOString()
+        } else {
+          ret[option.primaryKey.sortKey[0]] = String(this.sortKey(value as Schema))
+        }
+      }
+
+      return ret as T;
+    }
+  }
+
+  getItem<T extends Record<string, any>>(data: any) {
     if (data) {
       const ret = {};
       const attributeKeys = Object.keys(this.attributes);
@@ -67,7 +100,5 @@ export default class BladeSchema<
 
       return ret as T;
     }
-
-    return;
   }
 }

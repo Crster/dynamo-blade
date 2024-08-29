@@ -11,106 +11,89 @@ import {
   Option,
   CollectionName,
   CollectionSchemaKey,
+  BladeItem
 } from "./BladeType";
-import { decodeNext, buildItems, encodeNext, buildItem } from "./utils/index";
+import { buildItems, decodeNext } from "./utils/index";
 import BladeFilter from "./BladeFilter";
 
 export default class BladeCollection<
   Opt extends Option,
-  Collection extends CollectionName<Opt>
+  Collection extends string & CollectionName<Opt>
 > {
   private option: Opt;
   private collection: Collection;
+  private key: Partial<CollectionSchemaKey<Opt, Collection>>;
+  private tailed: boolean;
 
   constructor(option: Opt, collection: Collection) {
     this.option = option;
     this.collection = collection;
   }
 
-  is<K extends CollectionSchemaKey<Opt, Collection>>(key: K) {
-    return new BladeDocument<Opt, Collection>(
-      this.option,
-      this.collection,
-      key
-    );
+  is<K extends Partial<CollectionSchemaKey<Opt, Collection>>>(
+    hashKey: K,
+    sortKey?: K
+  ) {
+    if (sortKey) {
+      return new BladeDocument<Opt, Collection>(this.option, this.collection, {
+        ...hashKey,
+        ...sortKey,
+      });
+    } else {
+      this.key = hashKey;
+      return this;
+    }
   }
 
   tail() {
-    this.option.forwardScan = false;
+    this.tailed = true;
     return this;
   }
 
   async get(next?: string) {
-    const { client, tableName, isUseIndex, getFieldName, getFieldValue } =
-      this.option;
+    const { client, tableName, primaryKey, schema } = this.option;
+
+    if (!this.key)
+      throw new Error("Must call is(hashKey) before calling get()");
+
+    const key = schema[this.collection].getKey(this.option, this.key);
 
     const input: QueryCommandInput = {
       TableName: tableName,
-      KeyConditionExpression: `${getFieldName(
-        "HASH"
-      )} = :hashKey AND begins_with(${getFieldName("SORT")}, :sortKey)`,
+      KeyConditionExpression: `${primaryKey.hashKey[0]} = :hashKey`,
       ExpressionAttributeValues: {
-        ":hashKey": getFieldValue("HASH"),
-        ":sortKey": getFieldValue("SORT"),
+        ":hashKey": key[primaryKey.hashKey[0]],
       },
       ExclusiveStartKey: decodeNext(next),
-      ScanIndexForward: this.option.forwardScan,
+      ScanIndexForward: !this.tailed,
     };
 
-    // Using Index
-    if (isUseIndex()) {
-      input.IndexName = getFieldName("INDEX");
-      input.KeyConditionExpression = `${getFieldName("HASH_INDEX")} = :hashKey`;
-      input.ExpressionAttributeValues = {
-        ":hashKey": getFieldValue("HASH"),
-      };
-    }
-
-    try {
-      const result = await client.send(new QueryCommand(input));
-      return buildItems<Opt, Collection>(
-        result.Items,
-        encodeNext(result.LastEvaluatedKey),
-        this.option
-      );
-    } catch (err) {
-      console.warn(
-        `Failed to get ${getFieldValue("PRIMARY_KEY")} (${err.message})`
-      );
-      return buildItems<Opt, Collection>([], null, this.option);
-    }
+    const result = await client.send(new QueryCommand(input));
+    return buildItems<Opt, Collection>(this.option, this.collection, result);
   }
 
-  addLater(key: string, value: CollectionSchema<Opt, Collection>) {
-    const { tableName, getFieldName, getFieldValue } = this.option.openKey(key);
+  addLater(value: CollectionSchema<Opt, Collection>) {
+    const { tableName, schema } = this.option;
+
+    const val = schema[this.collection].getItem(value);
+    const key = schema[this.collection].getKey(this.option, value);
 
     const command = new PutCommand({
       TableName: tableName,
       Item: {
-        ...value,
-        [getFieldName("HASH")]: getFieldValue("HASH"),
-        [getFieldName("SORT")]: getFieldValue("SORT"),
-        [getFieldName("HASH_INDEX")]: getFieldValue("HASH_INDEX"),
-        [getFieldName("SORT_INDEX")]: getFieldValue("SORT_INDEX"),
+        ...val,
+        ...key,
       },
     });
 
     return command;
   }
 
-  async add(key: string, value: CollectionSchema<Opt, Collection>) {
-    const command = this.addLater(key, value);
-    try {
-      const result = await this.option.client.send(command);
-      if (result.$metadata.httpStatusCode === 200) {
-        return buildItem<Opt, Collection>(command.input.Item, this.option);
-      }
-    } catch (err) {
-      console.warn(
-        `Failed to add ${this.option.getFieldValue("PRIMARY_KEY")} (${
-          err.message
-        })`
-      );
+  async add(value: Partial<BladeItem<Opt["schema"][Collection]>>) {
+    const command = this.addLater(value);
+    const result = await this.option.client.send(command);
+    if (result.$metadata.httpStatusCode === 200) {
+      return this.option.schema[this.collection].getItem<BladeItem<Opt["schema"][Collection]>>(value);
     }
   }
 
@@ -123,6 +106,9 @@ export default class BladeCollection<
   ) {
     return new BladeFilter<Opt, Collection>(
       this.option,
+      this.collection,
+      this.key,
+      this.tailed,
       field,
       condition,
       Array.isArray(value) ? value : [value]

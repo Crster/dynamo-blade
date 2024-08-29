@@ -1,29 +1,45 @@
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
-import BladeOption from "./BladeOption";
-import { ValueFilter, CollectionSchema, Option } from "./BladeType";
-import { buildItems, decodeNext, encodeNext } from "./utils";
+import {
+  ValueFilter,
+  CollectionSchema,
+  Option,
+  CollectionName,
+  CollectionSchemaKey,
+} from "./BladeType";
+import { buildItems, decodeNext } from "./utils";
 
 export default class BladeFilter<
   Opt extends Option,
-  Collection extends keyof Opt["schema"]
+  Collection extends string & CollectionName<Opt>
 > {
-  private option: BladeOption<Opt>;
+  private option: Opt;
+  private collection: Collection;
+  private key: Partial<CollectionSchemaKey<Opt, Collection>>;
+  private tailed: boolean;
   private filters: Array<[any, ValueFilter, ...any]>;
 
   constructor(
-    option: BladeOption<Opt>,
+    option: Opt,
+    collection: Collection,
+    key: Partial<CollectionSchemaKey<Opt, Collection>>,
+    tailed: boolean,
     field: any,
     condition: ValueFilter,
     value: Array<any>
   ) {
     this.option = option;
+    this.collection = collection;
+    this.key = key;
+    this.tailed = tailed;
     this.filters = [[field, condition, value]];
   }
 
   where<F extends keyof CollectionSchema<Opt, Collection>>(
     field: F,
     condition: ValueFilter,
-    value: CollectionSchema<Opt, Collection>[F] | Array<CollectionSchema<Opt, Collection>[F]>
+    value:
+      | CollectionSchema<Opt, Collection>[F]
+      | Array<CollectionSchema<Opt, Collection>[F]>
   ) {
     this.filters.push([
       field,
@@ -34,34 +50,19 @@ export default class BladeFilter<
   }
 
   async get(next?: string) {
-    const {
-      client,
-      tableName,
-      collection,
-      isUseIndex,
-      getFieldName,
-      getFieldValue,
-    } = this.option;
+    const { client, tableName, primaryKey, schema } = this.option;
 
     const filterExpression: Array<string> = [];
     const keyConditionExpression: Array<string> = [];
     const expressionAttributeNames = new Map<string, string>();
     const expressionAttributeValues = new Map<string, any>();
 
-    const hashKey = isUseIndex()
-      ? getFieldName("HASH_INDEX")
-      : getFieldName("HASH");
-    const sortKey = isUseIndex()
-      ? getFieldName("SORT_INDEX")
-      : getFieldName("SORT");
-
-    const hashKeyValue = isUseIndex()
-      ? getFieldValue("HASH_INDEX")
-      : getFieldValue("HASH");
-
     // Build Key Condition
-    keyConditionExpression.push(`${hashKey} = :hashKey`);
-    expressionAttributeValues.set(":hashKey", hashKeyValue as any);
+    const sortKey = primaryKey.sortKey ? primaryKey.sortKey[0] : undefined;
+    const key = schema[this.collection].getKey(this.option, this.key);
+
+    keyConditionExpression.push(`${primaryKey.hashKey[0]} = :hashKey`);
+    expressionAttributeValues.set(":hashKey", key[primaryKey.hashKey[0]]);
 
     let counter = 0;
     for (const [field, condition, value] of this.filters) {
@@ -69,15 +70,10 @@ export default class BladeFilter<
 
       // Build Filter Condition
       if (field !== sortKey) {
-        if (!isUseIndex()) {
-          keyConditionExpression.push(
-            `begins_with(${sortKey}, :sortKey${counter})`
-          );
-          expressionAttributeValues.set(
-            `:sortKey${counter}`,
-            collection as any
-          );
-        }
+        keyConditionExpression.push(
+          `begins_with(${sortKey}, :sortKey${counter})`
+        );
+        expressionAttributeValues.set(`:sortKey${counter}`, this.collection);
       }
 
       const filterCondition =
@@ -142,32 +138,20 @@ export default class BladeFilter<
       }
     }
 
-    try {
-      const command = new QueryCommand({
-        TableName: tableName,
-        IndexName: isUseIndex() ? getFieldName("INDEX") : undefined,
-        KeyConditionExpression: keyConditionExpression.join(" AND "),
-        FilterExpression:
-          filterExpression.length > 0
-            ? filterExpression.join(" AND ")
-            : undefined,
-        ExpressionAttributeValues: Object.fromEntries(
-          expressionAttributeValues
-        ),
-        ExpressionAttributeNames: Object.fromEntries(expressionAttributeNames),
-        ExclusiveStartKey: decodeNext(next),
-        ScanIndexForward: this.option.forwardScan,
-      });
+    const command = new QueryCommand({
+      TableName: tableName,
+      KeyConditionExpression: keyConditionExpression.join(" AND "),
+      FilterExpression:
+        filterExpression.length > 0
+          ? filterExpression.join(" AND ")
+          : undefined,
+      ExpressionAttributeValues: Object.fromEntries(expressionAttributeValues),
+      ExpressionAttributeNames: Object.fromEntries(expressionAttributeNames),
+      ExclusiveStartKey: decodeNext(next),
+      ScanIndexForward: !this.tailed,
+    });
 
-      const result = await client.send(command);
-      return buildItems<Opt, Collection>(
-        result.Items,
-        encodeNext(result.LastEvaluatedKey),
-        this.option
-      );
-    } catch (err) {
-      console.warn(`Failed to get ${collection} (${err.message})`);
-      return buildItems<Opt, Collection>([], null, this.option);
-    }
+    const result = await client.send(command);
+    return buildItems<Opt, Collection>(this.option, this.collection, result);
   }
 }

@@ -3,7 +3,6 @@ import {
   UpdateCommand,
   GetCommand,
   QueryCommand,
-  QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 
 import {
@@ -15,11 +14,11 @@ import {
   CollectionSchemaKey,
   BladeItem,
 } from "./BladeType";
-import { buildCondition, buildItems, decodeNext, encodeNext } from "./utils";
+import { buildCondition } from "./utils";
 
 export default class BladeDocument<
   Opt extends Option,
-  Collection extends string & keyof Opt["schema"]
+  Collection extends string & CollectionName<Opt>
 > {
   private option: Opt;
   private collection: Collection;
@@ -36,36 +35,24 @@ export default class BladeDocument<
   }
 
   async get(consistent?: boolean) {
-    const { client, tableName, primaryKey, schema } = this.option;
+    const { client, tableName, schema } = this.option;
 
-    const key = new Map<string, any>();
-    if (primaryKey.hashKey) {
-      key.set(
-        primaryKey.hashKey[0],
-        schema[this.collection]["hashKey"](this.key)
-      );
-    }
-    if (primaryKey.sortKey) {
-      key.set(
-        primaryKey.sortKey[0],
-        schema[this.collection]["sortKey"](this.key)
-      );
-    }
+    const key = schema[this.collection].getKey(this.option, this.key);
 
     const command = new GetCommand({
       TableName: tableName,
-      Key: Object.fromEntries(key),
+      Key: key,
       ConsistentRead: consistent,
     });
 
     const result = await client.send(command);
-    return schema[this.collection].buildItem<
+    return schema[this.collection].getItem<
       BladeItem<Opt["schema"][Collection]>
     >(result.Item);
   }
 
   when(conditions: Array<Condition>) {
-    const { tableName, primaryKey, schema } = this.option;
+    const { tableName, schema } = this.option;
 
     const expressionAttributeName = new Map<string, string>();
     const expressionAttributeValues = new Map<string, any>();
@@ -77,23 +64,11 @@ export default class BladeDocument<
       conditions
     );
 
-    const key = new Map<string, any>();
-    if (primaryKey.hashKey) {
-      key.set(
-        primaryKey.hashKey[0],
-        schema[this.collection]["hashKey"](this.key)
-      );
-    }
-    if (primaryKey.sortKey) {
-      key.set(
-        primaryKey.sortKey[0],
-        schema[this.collection]["sortKey"](this.key)
-      );
-    }
+    const key = schema[this.collection].getKey(this.option, this.key);
 
     const command = new QueryCommand({
       TableName: tableName,
-      ExclusiveStartKey: Object.fromEntries(key),
+      ExclusiveStartKey: key,
       ExpressionAttributeNames: Object.fromEntries(expressionAttributeName),
       ExpressionAttributeValues: Object.fromEntries(expressionAttributeValues),
       FilterExpression: filterExpression,
@@ -106,7 +81,7 @@ export default class BladeDocument<
     value: UpdateValue<CollectionSchema<Opt, Collection>>,
     conditions?: Array<Condition>
   ) {
-    const { tableName, primaryKey, schema } = this.option;
+    const { tableName, schema } = this.option;
 
     const updateExpression: Array<string> = [];
     const expressionAttributeName = new Map<string, string>();
@@ -211,23 +186,11 @@ export default class BladeDocument<
       conditions
     );
 
-    const key = new Map<string, any>();
-    if (primaryKey.hashKey) {
-      key.set(
-        primaryKey.hashKey[0],
-        schema[this.collection]["hashKey"](this.key)
-      );
-    }
-    if (primaryKey.sortKey) {
-      key.set(
-        primaryKey.sortKey[0],
-        schema[this.collection]["sortKey"](this.key)
-      );
-    }
+    const key = schema[this.collection].getKey(this.option, this.key);
 
     const command = new UpdateCommand({
       TableName: tableName,
-      Key: Object.fromEntries(key),
+      Key: key,
       UpdateExpression: updateExpression.join("\n"),
       ExpressionAttributeNames: Object.fromEntries(expressionAttributeName),
       ExpressionAttributeValues: Object.fromEntries(expressionAttributeValues),
@@ -248,25 +211,12 @@ export default class BladeDocument<
   }
 
   removeLater() {
-    const { tableName, primaryKey, schema } = this.option;
-
-    const key = new Map<string, any>();
-    if (primaryKey.hashKey) {
-      key.set(
-        primaryKey.hashKey[0],
-        schema[this.collection]["hashKey"](this.key)
-      );
-    }
-    if (primaryKey.sortKey) {
-      key.set(
-        primaryKey.sortKey[0],
-        schema[this.collection]["sortKey"](this.key)
-      );
-    }
+    const { tableName, schema } = this.option;
+    const key = schema[this.collection].getKey(this.option, this.key);
 
     const command = new DeleteCommand({
       TableName: tableName,
-      Key: Object.fromEntries(key),
+      Key: key,
     });
 
     return command;

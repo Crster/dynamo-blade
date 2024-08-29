@@ -20,7 +20,6 @@ export type Option = {
   primaryKey: {
     hashKey: [string, SchemaType];
     sortKey?: [string, SchemaType];
-    separator?: string;
   };
   localIndex?: Record<string, BladeSchema<any, any>>;
   globalIndex?: Record<string, BladeSchema<any, any>>;

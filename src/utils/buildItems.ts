@@ -1,22 +1,13 @@
-import BladeOption from "../BladeOption";
-import { CollectionSchema, Option, QueryResult } from "../BladeType";
-import buildItem from "./buildItem";
+import { QueryCommandOutput } from "@aws-sdk/lib-dynamodb";
+import { CollectionName, Option } from "../BladeType";
+import { encodeNext } from "./buildNext";
 
 export default function buildItems<
   Opt extends Option,
-  Collection extends keyof Opt["schema"]
->(values: Array<Record<string, any>>, next: string, option: BladeOption<Opt>) {
-  const ret: QueryResult<CollectionSchema<Opt, Collection>> = { items: [] };
-
-  if (values && Array.isArray(values) && values.length > 0) {
-    for (const value of values) {
-      ret.items.push(buildItem<Opt, Collection>(value, option));
-    }
-
-    if (next) {
-      ret.next = next;
-    }
-  }
-
-  return ret;
+  Collection extends string & CollectionName<Opt>
+>(option: Opt, collection: Collection, result: QueryCommandOutput) {
+  return {
+    items: result.Items.map((ii) => option.schema[collection].getItem(ii)),
+    next: encodeNext(result.LastEvaluatedKey),
+  };
 }
