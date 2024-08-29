@@ -1,6 +1,6 @@
 import { dbInstance as db } from "./test/dbInstance";
 
-test("test add artist", async () => {
+test("add artist", async () => {
   const akon = await db.open("artist").add({
     ArtistId: "akon",
     Name: "Akon Thiam",
@@ -9,3 +9,7 @@ test("test add artist", async () => {
 
   expect(akon?.ArtistId)
 });
+
+test("add song", async () => {
+  const song1 = await db.open("song").get
+})

@@ -54,30 +54,50 @@ export default class BladeSchema<
 
   getKey<T extends Record<string, any>>(option: Option, data: any) {
     if (data) {
-      const ret = {}
+      const ret = {};
       const value = this.getItem(data);
 
       if (this.hashKey) {
         if (option.primaryKey.hashKey[1] instanceof Number) {
-          ret[option.primaryKey.hashKey[0]] = Number(this.hashKey(value as Schema))
-        } if (option.primaryKey.hashKey[1] instanceof Boolean) {
-          ret[option.primaryKey.hashKey[0]] = this.hashKey(value as Schema) ? "true" : "false"
-        } if (option.primaryKey.hashKey[1] instanceof Date) {
-          ret[option.primaryKey.hashKey[0]] = new Date(this.hashKey(value as Schema)).toISOString()
+          ret[option.primaryKey.hashKey[0]] = Number(
+            this.hashKey(value as Schema)
+          );
+        }
+        if (option.primaryKey.hashKey[1] instanceof Boolean) {
+          ret[option.primaryKey.hashKey[0]] = this.hashKey(value as Schema)
+            ? "true"
+            : "false";
+        }
+        if (option.primaryKey.hashKey[1] instanceof Date) {
+          ret[option.primaryKey.hashKey[0]] = new Date(
+            this.hashKey(value as Schema)
+          ).toISOString();
         } else {
-          ret[option.primaryKey.hashKey[0]] = String(this.hashKey(value as Schema))
+          ret[option.primaryKey.hashKey[0]] = String(
+            this.hashKey(value as Schema)
+          );
         }
       }
 
       if (this.sortKey && option.primaryKey.sortKey) {
         if (option.primaryKey.sortKey[1] instanceof Number) {
-          ret[option.primaryKey.sortKey[0]] = Number(this.sortKey(value as Schema))
-        } if (option.primaryKey.sortKey[1] instanceof Boolean) {
-          ret[option.primaryKey.sortKey[0]] = this.sortKey(value as Schema) ? "true" : "false"
-        } if (option.primaryKey.sortKey[1] instanceof Date) {
-          ret[option.primaryKey.sortKey[0]] = new Date(this.sortKey(value as Schema)).toISOString()
+          ret[option.primaryKey.sortKey[0]] = Number(
+            this.sortKey(value as Schema)
+          );
+        }
+        if (option.primaryKey.sortKey[1] instanceof Boolean) {
+          ret[option.primaryKey.sortKey[0]] = this.sortKey(value as Schema)
+            ? "true"
+            : "false";
+        }
+        if (option.primaryKey.sortKey[1] instanceof Date) {
+          ret[option.primaryKey.sortKey[0]] = new Date(
+            this.sortKey(value as Schema)
+          ).toISOString();
         } else {
-          ret[option.primaryKey.sortKey[0]] = String(this.sortKey(value as Schema))
+          ret[option.primaryKey.sortKey[0]] = String(
+            this.sortKey(value as Schema)
+          );
         }
       }
 
@@ -86,19 +106,17 @@ export default class BladeSchema<
   }
 
   getItem<T extends Record<string, any>>(data: any) {
-    if (data) {
-      const ret = {};
-      const attributeKeys = Object.keys(this.attributes);
+    const ret = {};
+    const attributeKeys = Object.keys(this.attributes);
 
-      for (let xx = 0; xx < attributeKeys.length; xx++) {
-        const attributeKey = attributeKeys[xx];
-        const value = this.getItemValue(attributeKey, data[attributeKey]);
-        if (value) {
-          ret[attributeKey] = value;
-        }
+    for (let xx = 0; xx < attributeKeys.length; xx++) {
+      const attributeKey = attributeKeys[xx];
+      const value = this.getItemValue(attributeKey, data[attributeKey]);
+      if (value) {
+        ret[attributeKey] = value;
       }
-
-      return ret as T;
     }
+
+    return ret as T;
   }
 }

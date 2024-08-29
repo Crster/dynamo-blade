@@ -11,10 +11,11 @@ import {
   Option,
   CollectionName,
   CollectionSchemaKey,
-  BladeItem
+  BladeItem,
 } from "./BladeType";
 import { buildItems, decodeNext } from "./utils/index";
 import BladeFilter from "./BladeFilter";
+import BladeError from "./BladedError";
 
 export default class BladeCollection<
   Opt extends Option,
@@ -30,19 +31,12 @@ export default class BladeCollection<
     this.collection = collection;
   }
 
-  is<K extends Partial<CollectionSchemaKey<Opt, Collection>>>(
-    hashKey: K,
-    sortKey?: K
-  ) {
-    if (sortKey) {
-      return new BladeDocument<Opt, Collection>(this.option, this.collection, {
-        ...hashKey,
-        ...sortKey,
-      });
-    } else {
-      this.key = hashKey;
-      return this;
-    }
+  is<K extends CollectionSchemaKey<Opt, Collection>>(key: K) {
+    return new BladeDocument<Opt, Collection>(
+      this.option,
+      this.collection,
+      key
+    );
   }
 
   tail() {
@@ -90,10 +84,19 @@ export default class BladeCollection<
   }
 
   async add(value: Partial<BladeItem<Opt["schema"][Collection]>>) {
-    const command = this.addLater(value);
-    const result = await this.option.client.send(command);
-    if (result.$metadata.httpStatusCode === 200) {
-      return this.option.schema[this.collection].getItem<BladeItem<Opt["schema"][Collection]>>(value);
+    const { schema } = this.option;
+
+    try {
+      const command = this.addLater(value);
+      const result = await this.option.client.send(command);
+
+      if (result.$metadata.httpStatusCode === 200) {
+        return schema[this.collection].getItem<
+          BladeItem<Opt["schema"][Collection]>
+        >(value);
+      }
+    } catch (err) {
+      throw new BladeError("Failed to add item");
     }
   }
 
