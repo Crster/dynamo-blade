@@ -9,33 +9,24 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { BillingMode, CreateTableCommand } from "@aws-sdk/client-dynamodb";
 
-import { Option, FieldType, CollectionName } from "./BladeType";
-import BladeOption from "./BladeOption";
+import { Option, CollectionName } from "./BladeType";
 import BladeCollection from "./BladeCollection";
 
 export default class DynamoBlade<Opt extends Option> {
-  public option: BladeOption<Opt>;
+  public option: Opt;
 
   constructor(option: Opt) {
     if (!option) throw new Error("Option is required");
     if (!option.tableName) throw new Error("option.tableName is required");
     if (!option.client) throw new Error("option.client is required");
+    if (!option.primaryKey) throw new Error("option.index is required");
+    if (!option.schema) throw new Error("option.schema is required");
 
-    this.option = new BladeOption<Opt>(option);
+    this.option = option;
   }
 
-  open<C extends CollectionName<Opt>>(collection: C) {
-    return new BladeCollection<Opt, C>(
-      this.option.openCollection(collection)
-    );
-  }
-
-  key(primaryKey: string, collection?: string) {
-    return this.option.getKey(primaryKey, collection);
-  }
-
-  field(type: FieldType) {
-    return this.option.getFieldName(type);
+  open<Collection extends CollectionName<Opt>>(collection: Collection) {
+    return new BladeCollection<Opt, Collection>(this.option, collection);
   }
 
   async init(billingMode: BillingMode = "PAY_PER_REQUEST") {

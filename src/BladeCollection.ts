@@ -4,25 +4,35 @@ import {
   QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 
-import { decodeNext, buildItems, encodeNext, buildItem } from "./utils/index";
-import BladeOption from "./BladeOption";
 import BladeDocument from "./BladeDocument";
 import {
   ValueFilter,
-  BladeItem,
+  CollectionSchema,
   Option,
+  CollectionName,
+  CollectionSchemaKey,
 } from "./BladeType";
+import { decodeNext, buildItems, encodeNext, buildItem } from "./utils/index";
 import BladeFilter from "./BladeFilter";
 
-export default class BladeCollection<Opt extends Option, Collection extends keyof Opt["schema"]> {
-  private option: BladeOption<Opt>;
+export default class BladeCollection<
+  Opt extends Option,
+  Collection extends CollectionName<Opt>
+> {
+  private option: Opt;
+  private collection: Collection;
 
-  constructor(option: BladeOption<Opt>) {
+  constructor(option: Opt, collection: Collection) {
     this.option = option;
+    this.collection = collection;
   }
 
-  is(key: string) {
-    return new BladeDocument<Opt, Collection>(this.option.openKey(key));
+  is<K extends CollectionSchemaKey<Opt, Collection>>(key: K) {
+    return new BladeDocument<Opt, Collection>(
+      this.option,
+      this.collection,
+      key
+    );
   }
 
   tail() {
@@ -71,7 +81,7 @@ export default class BladeCollection<Opt extends Option, Collection extends keyo
     }
   }
 
-  addLater(key: string, value: BladeItem<Opt, Collection>) {
+  addLater(key: string, value: CollectionSchema<Opt, Collection>) {
     const { tableName, getFieldName, getFieldValue } = this.option.openKey(key);
 
     const command = new PutCommand({
@@ -88,7 +98,7 @@ export default class BladeCollection<Opt extends Option, Collection extends keyo
     return command;
   }
 
-  async add(key: string, value: BladeItem<Opt, Collection>) {
+  async add(key: string, value: CollectionSchema<Opt, Collection>) {
     const command = this.addLater(key, value);
     try {
       const result = await this.option.client.send(command);
@@ -104,10 +114,12 @@ export default class BladeCollection<Opt extends Option, Collection extends keyo
     }
   }
 
-  where<F extends keyof BladeItem<Opt, Collection>>(
+  where<F extends keyof CollectionSchema<Opt, Collection>>(
     field: F,
     condition: ValueFilter,
-    value: BladeItem<Opt, Collection>[F] | Array<BladeItem<Opt, Collection>[F]>
+    value:
+      | CollectionSchema<Opt, Collection>[F]
+      | Array<CollectionSchema<Opt, Collection>[F]>
   ) {
     return new BladeFilter<Opt, Collection>(
       this.option,

@@ -3,73 +3,21 @@ import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import DynamoBlade from "./src/index";
 import BladeSchema from "./src/BladeSchema";
 
-interface Artist {
-  ArtistId: string;
-  Model: string;
-  Name: string;
-}
-
-const artistSchema = BladeSchema<Artist>({
-  Model: {
-    type: "HASH",
-    value: "artist",
-  },
-  ArtistId: {
-    type: "SORT",
-    value: (ii) => `artist#${ii.ArtistId}`,
-  },
-  Name: {
-    type: String,
+const songSchema = new BladeSchema({
+  hashKey: (ii) => `artist#${ii.ArtistId}:albumId#${ii.AlbumId}`,
+  sortKey: (ii) => `songId#${ii.SongId}`,
+  keyAttributes: ["ArtistId", "AlbumId", "SongId"],
+  attributes: {
+    ArtistId: String,
+    AlbumId: String,
+    SongId: String,
+    Title: String,
+    Length: Number,
+    Model: {
+      type: String
+    },
   },
 });
-
-interface Album {
-  AlbumId: string;
-  ArtistId: string;
-  Title: string;
-}
-
-const albumSchema = BladeSchema<Album>({
-  AlbumId: {
-    type: "SORT",
-    value: (ii) => `album#${ii.AlbumId}`,
-  },
-  ArtistId: {
-    type: "HASH",
-    value: (ii) => `artist#${ii.ArtistId}`,
-  },
-  Title: {
-    type: String,
-  },
-});
-
-interface Song {
-  ArtistId: string;
-  AlbumId: string;
-  SongId: string;
-  Title: string;
-}
-
-const songSchema = BladeSchema<Song>(
-  {
-    ArtistId: {
-      type: "HASH",
-      value: (ii) => `artist#${ii.ArtistId}`,
-    },
-    AlbumId: {
-      type: "HASH",
-      value: (ii) => `album#${ii.AlbumId}`,
-    },
-    SongId: {
-      type: "SORT",
-      value: (ii) => `song#${ii.SongId}`,
-    },
-    Title: {
-      type: String,
-    },
-  },
-  (ii) => !!ii.Title
-);
 
 const db = new DynamoBlade({
   tableName: "testdb",
@@ -79,12 +27,17 @@ const db = new DynamoBlade({
       endpoint: "http://localhost:8000",
     })
   ),
+  primaryKey: {
+    hashKey: ["PK", String],
+    sortKey: ["SK", String],
+    separator: ":",
+  },
   schema: {
-    artist: artistSchema,
-    album: albumSchema,
     song: songSchema,
   },
 });
 
-
-const papa = await db.open("artist").is("papa").get()
+const result = await db
+  .open("song")
+  .is({ ArtistId: "Hahaha", AlbumId: "Test", SongId: "555" })
+  .get();

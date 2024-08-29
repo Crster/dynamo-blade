@@ -1,6 +1,6 @@
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import BladeOption from "./BladeOption";
-import { ValueFilter, BladeItem, Option } from "./BladeType";
+import { ValueFilter, CollectionSchema, Option } from "./BladeType";
 import { buildItems, decodeNext, encodeNext } from "./utils";
 
 export default class BladeFilter<
@@ -20,10 +20,10 @@ export default class BladeFilter<
     this.filters = [[field, condition, value]];
   }
 
-  where<F extends keyof BladeItem<Opt, Collection>>(
+  where<F extends keyof CollectionSchema<Opt, Collection>>(
     field: F,
     condition: ValueFilter,
-    value: BladeItem<Opt, Collection>[F] | Array<BladeItem<Opt, Collection>[F]>
+    value: CollectionSchema<Opt, Collection>[F] | Array<CollectionSchema<Opt, Collection>[F]>
   ) {
     this.filters.push([
       field,
