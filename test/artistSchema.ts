@@ -1,16 +1,28 @@
-import BladeSchema from "../src/BladeSchema";
+import BladeTable from "../src/BladeTable";
+import BladeView from "../src/BladeView";
 
-export const artistSchema = new BladeSchema({
-  PK: {
-    type: String,
-    value: (ii) => `artist#${ii.ArtistId}`,
+export const artistSchema = new BladeTable(
+  {
+    ArtistId: {
+      type: String,
+      required: true,
+    },
+    Name: String,
+    BirthDate: Date,
+    Age: Number,
   },
-  SK: {
-    type: String,
-    value: (ii) => `artist#${ii.ArtistId}`,
+  {
+    HashKey: (ii) => `artist#${ii.ArtistId}`,
+    SortKey: (ii) => `artist#${ii.ArtistId}`,
+  }
+);
+
+export const activeArtist = new BladeView(
+  {
+    DateFrom: Date,
+    DateTo: Date,
   },
-  ArtistId: String,
-  Name: String,
-  BirthDate: Date,
-  Age: Number
-}, ["ArtistId"]);
+  {
+    HashKey: ["Age", "BETWEEN", "DateFrom", "DateTo"],
+  }
+);

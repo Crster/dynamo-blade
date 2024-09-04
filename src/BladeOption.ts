@@ -1,6 +1,5 @@
-import BladeSchema from "./BladeSchema";
-
+import BladeTable from "./BladeTable";
 export default interface BladeOption {
   tableName: string;
-  schema: Record<string, BladeSchema<any>>;
+  schema: Record<string, BladeTable<any, any>>;
 }

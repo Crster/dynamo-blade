@@ -1,5 +1,5 @@
 import DynamoBlade from "../src/DynamoBlade";
-import { artistSchema } from "./artistSchema";
+import { activeArtist, artistSchema } from "./artistSchema";
 import { songSchema } from "./songSchema";
 
 export const db = new DynamoBlade({
@@ -7,5 +7,8 @@ export const db = new DynamoBlade({
   schema: {
     artist: artistSchema,
     song: songSchema,
+  },
+  view: {
+    activeArtist,
   },
 });

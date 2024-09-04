@@ -2,7 +2,7 @@ import BladeCollection from "./BladeCollection";
 import BladeOption from "./BladeOption";
 
 export default class DynamoBlade<Option extends BladeOption> {
-  public option: Option;
+  public readonly option: Option;
 
   constructor(option: Option) {
     this.option = option;
