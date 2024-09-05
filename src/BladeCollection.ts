@@ -1,23 +1,41 @@
-import BladeDocument from "./BladeDocument";
-import { RequiredBladeItem } from "./BladeItem";
-import BladeOption from "./BladeOption";
-export default class BladeCollection<
-  Option extends BladeOption,
-  SchemaKey extends keyof Option["schema"]
+import { DynamoBladeCollectionType, DynamoBladeItemType, DynamoBladeOption } from "./DynamoBlade";
+
+export interface BladeCollectionSchemaAttribute {
+  type: DynamoBladeItemType & DynamoBladeCollectionType,
+  itemType?: DynamoBladeItemType,
+  
+}
+
+export type BladeCollectionSchemaAttributes = Record<string, DynamoBladeItemType>
+
+export interface BladeCollectionSchema<
+  Schema extends BladeCollectionSchemaAttributes
 > {
-  private readonly option: Option;
-  private readonly schemaKey: SchemaKey;
+  key: {
+    hashKey: (ii: Schema) => any;
+    sortKey?: (ii: Schema) => any;
+  };
+  attribute: Schema;
+}
 
-  constructor(option: Option, schemaKey: SchemaKey) {
+export default class BladeCollection<Schema extends BladeCollectionSchemaAttributes>{
+  private readonly option: DynamoBladeOption;
+  private readonly collection: string;
+  private readonly schema: BladeCollectionSchema<Schema>;
+
+  constructor(option: DynamoBladeOption, collection: string, schema: BladeCollectionSchema<Schema>) {
     this.option = option;
-    this.schemaKey = schemaKey;
+    this.collection = collection;
+    this.schema = schema;
   }
 
-  is(key: RequiredBladeItem<Option["schema"][SchemaKey]>) {
-    return new BladeDocument(this.option, this.schemaKey, key);
+  get(key: any) {
+    return {} as Schema;
   }
 
-  where(index: keyof Option["schema"][SchemaKey]["index"]) {
-    
-  }
+  add() {}
+
+  update() {}
+
+  remove() {}
 }

@@ -1,14 +1,53 @@
-import BladeCollection from "./BladeCollection";
-import BladeOption from "./BladeOption";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import BladeCollection, { BladeCollectionSchema, BladeCollectionSchemaAttributes } from "./BladeCollection";
 
-export default class DynamoBlade<Option extends BladeOption> {
-  public readonly option: Option;
+export type DynamoBladeItemType =
+  | StringConstructor
+  | NumberConstructor
+  | BooleanConstructor
+  | BufferConstructor
+  | DateConstructor;
 
-  constructor(option: Option) {
+export type DynamoBladeCollectionType = ArrayConstructor | SetConstructor | MapConstructor;
+
+export interface DynamoBladeKey {
+  field: string;
+  type: DynamoBladeItemType;
+}
+
+export interface DynamoBladeIndex {
+  hashKey: DynamoBladeKey;
+  sortKey?: DynamoBladeKey;
+  type: "LOCAL" | "GLOBAL";
+  projection?: "ALL" | "KEYS" | Array<string>;
+  provision?: { read: number; write: number };
+}
+
+export interface DynamoBladeSchema {
+  hashKey: DynamoBladeKey;
+  sortKey?: DynamoBladeKey;
+  index?: Record<string, DynamoBladeIndex>;
+}
+
+export interface DynamoBladeOption {
+  table: string;
+  client: DynamoDBDocumentClient;
+  schema: DynamoBladeSchema;
+}
+
+export default class DynamoBlade {
+  public readonly option: DynamoBladeOption;
+
+  constructor(option: DynamoBladeOption) {
     this.option = option;
   }
 
-  open<SchemaKey extends keyof Option["schema"]>(schema: SchemaKey) {
-    return new BladeCollection(this.option, schema);
+  async init() {}
+
+  open<Schema extends BladeCollectionSchemaAttributes>(
+    collection: string,
+    schema: BladeCollectionSchema<Schema>
+  ) {
+    return new BladeCollection(this.option, collection, schema);
   }
 }
