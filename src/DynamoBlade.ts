@@ -1,39 +1,13 @@
-import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import BladeCollection, { BladeCollectionSchema, BladeCollectionSchemaAttributes } from "./BladeCollection";
-
-export type DynamoBladeItemType =
-  | StringConstructor
-  | NumberConstructor
-  | BooleanConstructor
-  | BufferConstructor
-  | DateConstructor;
-
-export type DynamoBladeCollectionType = ArrayConstructor | SetConstructor | MapConstructor;
-
-export interface DynamoBladeKey {
-  field: string;
-  type: DynamoBladeItemType;
-}
-
-export interface DynamoBladeIndex {
-  hashKey: DynamoBladeKey;
-  sortKey?: DynamoBladeKey;
-  type: "LOCAL" | "GLOBAL";
-  projection?: "ALL" | "KEYS" | Array<string>;
-  provision?: { read: number; write: number };
-}
-
-export interface DynamoBladeSchema {
-  hashKey: DynamoBladeKey;
-  sortKey?: DynamoBladeKey;
-  index?: Record<string, DynamoBladeIndex>;
-}
-
-export interface DynamoBladeOption {
-  table: string;
-  client: DynamoDBDocumentClient;
-  schema: DynamoBladeSchema;
-}
+import {
+  AttributeDefinition,
+  BillingMode,
+  CreateTableCommand,
+  KeySchemaElement,
+} from "@aws-sdk/client-dynamodb";
+import BladeCollection from "./BladeCollection";
+import { BladeSchema, BladeSchemaKey, DynamoBladeOption } from "./BladeType";
+import { BladeError, BladeErrorCode } from "./BladeError";
+import { generateScalarType } from "./BladeUtility";
 
 export default class DynamoBlade {
   public readonly option: DynamoBladeOption;
@@ -42,12 +16,57 @@ export default class DynamoBlade {
     this.option = option;
   }
 
-  async init() {}
+  async init(billingMode: BillingMode = "PAY_PER_REQUEST") {
+    const keySchema: Array<KeySchemaElement> = [];
+    const attributes: Array<AttributeDefinition> = [];
 
-  open<Schema extends BladeCollectionSchemaAttributes>(
-    collection: string,
-    schema: BladeCollectionSchema<Schema>
+    if (this.option.schema.hashKey) {
+      keySchema.push({
+        AttributeName: this.option.schema.hashKey.field,
+        KeyType: "HASH",
+      });
+      attributes.push({
+        AttributeName: this.option.schema.hashKey.field,
+        AttributeType: generateScalarType(this.option.schema.hashKey.type),
+      });
+    } else {
+      throw new BladeError(BladeErrorCode.KeyNotSet, "No HASH field is set");
+    }
+
+    if (this.option.schema.sortKey) {
+      keySchema.push({
+        AttributeName: this.option.schema.sortKey.field,
+        KeyType: "RANGE",
+      });
+      attributes.push({
+        AttributeName: this.option.schema.sortKey.field,
+        AttributeType: generateScalarType(this.option.schema.sortKey.type),
+      });
+    }
+
+    const command = new CreateTableCommand({
+      TableName: this.option.table,
+      KeySchema: keySchema,
+      AttributeDefinitions: attributes,
+      BillingMode: billingMode,
+    });
+
+    try {
+      await this.option.client.send(command);
+      return true;
+    } catch (err) {
+      if (err.name === "ResourceInUseException") {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  collection<Schema extends BladeSchema>(
+    schema: Schema,
+    key: BladeSchemaKey<Schema>
   ) {
-    return new BladeCollection(this.option, collection, schema);
+    return new BladeCollection(this.option, schema, key);
   }
 }

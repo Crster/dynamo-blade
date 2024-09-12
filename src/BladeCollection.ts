@@ -1,41 +1,60 @@
-import { DynamoBladeCollectionType, DynamoBladeItemType, DynamoBladeOption } from "./DynamoBlade";
+import {
+  BladeSchema,
+  DynamoBladeOption,
+  BladeSchemaKey,
+  RequiredBladeItem,
+  BladeItem,
+} from "./BladeType";
+import BladeView from "./BladeView";
+import BladeDocument from "./BladeDocument";
+import { PutCommand } from "@aws-sdk/lib-dynamodb";
+import { generateItem, generateKey, generateTimestamp } from "./BladeUtility";
 
-export interface BladeCollectionSchemaAttribute {
-  type: DynamoBladeItemType & DynamoBladeCollectionType,
-  itemType?: DynamoBladeItemType,
-  
-}
-
-export type BladeCollectionSchemaAttributes = Record<string, DynamoBladeItemType>
-
-export interface BladeCollectionSchema<
-  Schema extends BladeCollectionSchemaAttributes
+export default class BladeCollection<
+  Option extends DynamoBladeOption,
+  Schema extends BladeSchema
 > {
-  key: {
-    hashKey: (ii: Schema) => any;
-    sortKey?: (ii: Schema) => any;
-  };
-  attribute: Schema;
-}
+  private readonly option: Option;
+  private readonly schema: Schema;
+  private readonly key: BladeSchemaKey<Schema>;
 
-export default class BladeCollection<Schema extends BladeCollectionSchemaAttributes>{
-  private readonly option: DynamoBladeOption;
-  private readonly collection: string;
-  private readonly schema: BladeCollectionSchema<Schema>;
-
-  constructor(option: DynamoBladeOption, collection: string, schema: BladeCollectionSchema<Schema>) {
+  constructor(option: Option, schema: Schema, key: BladeSchemaKey<Schema>) {
     this.option = option;
-    this.collection = collection;
     this.schema = schema;
+    this.key = key;
   }
 
-  get(key: any) {
-    return {} as Schema;
+  is(keyValue: RequiredBladeItem<Schema>) {
+    return new BladeDocument(this.option, this.schema, this.key, keyValue);
   }
 
-  add() {}
+  async add(value: BladeItem<Schema>) {
+    const item = {
+      ...generateItem<Schema>(this.schema, value, "ADD"),
+      ...generateKey(this.option, this.key, value),
+      ...generateTimestamp(this.option, "ADD"),
+    };
 
-  update() {}
+    const command = new PutCommand({
+      TableName: this.option.table,
+      Item: item,
+    });
 
-  remove() {}
+    const result = await this.option.client.send(command);
+    if (result.$metadata.httpStatusCode === 200) {
+      return generateItem<Schema>(this.schema, item, "GET");
+    }
+  }
+
+  query(index?: string & keyof Option["schema"]["index"]) {
+    return new BladeView(this.option, this.schema, this.key, "QUERY", index);
+  }
+
+  queryDesc(index?: string & keyof Option["schema"]["index"]) {
+    return new BladeView(this.option, this.schema, this.key, "QUERYDESC", index);
+  }
+
+  scan(index?: string & keyof Option["schema"]["index"]) {
+    return new BladeView(this.option, this.schema, this.key, "SCAN", index);
+  }
 }

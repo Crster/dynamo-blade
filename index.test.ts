@@ -1,45 +1,53 @@
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import DynamoBlade from "./src/DynamoBlade";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import DynamoBlade from "./src/DynamoBlade";
 
 const db = new DynamoBlade({
-  client: DynamoDBDocumentClient.from(new DynamoDBClient()),
+  table: "test_db",
+  client: DynamoDBDocumentClient.from(
+    new DynamoDBClient({
+      region: "us-east-1",
+      endpoint: "http://localhost:8000",
+    })
+  ),
   schema: {
-    hashKey: {
-      field: "PK",
-      type: String,
-    },
-    sortKey: {
-      field: "SK",
-      type: String,
-    },
-    index: {
-      model: {
-        hashKey: {
-          field: "PK",
-          type: String
-        },
-        sortKey: {
-          field: "name",
-          type: String
-        },
-        type: "LOCAL"
-      },
-    },
+    hashKey: { field: "pk", type: String },
+    sortKey: { field: "sk", type: String },
+    createdOn: true,
+    modifiedOn: true,
   },
-  table: "db",
 });
 
-const artist = db.open("artist", {
-  attribute: {
-    id: String,
+const artist = db.collection(
+  {
+    id: {
+      type: String,
+      required: true,
+    },
     name: String,
     age: Number,
+    model: {
+      type: String,
+      value: () => "artist",
+    },
   },
-  key: {
-    hashKey: () => `artist`,
-    sortKey: (ii) => ii.id,
-  },
-});
+  {
+    hashKey: (ii) => `artist:${ii.id}`,
+    sortKey: (ii) => `artist:${ii.id}`,
+  }
+);
 
-const test = artist.get("");
+async function main() {
+  await db.init();
+
+  const akon = await artist.add({
+    id: "akon",
+    age: 60,
+    name: "Akon",
+  });
+
+  const result = await artist.query().where("HASH", "=", { id: "akon" }).get();
+  console.log(result);
+}
+
+main();
