@@ -1,53 +1,78 @@
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { BladeType, PrimaryKey } from "./src/BladeType";
 import DynamoBlade from "./src/DynamoBlade";
-
-const db = new DynamoBlade({
-  table: "test_db",
-  client: DynamoDBDocumentClient.from(
-    new DynamoDBClient({
-      region: "us-east-1",
-      endpoint: "http://localhost:8000",
-    })
-  ),
-  schema: {
-    hashKey: { field: "pk", type: String },
-    sortKey: { field: "sk", type: String },
-    createdOn: true,
-    modifiedOn: true,
-  },
-});
-
-const artist = db.collection(
-  {
-    id: {
-      type: String,
-      required: true,
-    },
-    name: String,
-    age: Number,
-    model: {
-      type: String,
-      value: () => "artist",
-    },
-  },
-  {
-    hashKey: (ii) => `artist:${ii.id}`,
-    sortKey: (ii) => `artist:${ii.id}`,
-  }
-);
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 
 async function main() {
-  await db.init();
-
-  const akon = await artist.add({
-    id: "akon",
-    age: 60,
-    name: "Akon",
+  const song = new BladeType({
+    songId: PrimaryKey,
+    title: String,
+    length: Number,
   });
 
-  const result = await artist.query().where("HASH", "=", { id: "akon" }).get();
-  console.log(result);
+  const album = new BladeType({
+    albumId: PrimaryKey,
+    title: String,
+    song,
+  });
+
+  const artist = new BladeType({
+    artistId: PrimaryKey,
+    name: String,
+    age: String,
+    album,
+  });
+
+  const concert = new BladeType({
+    concertId: PrimaryKey,
+    artistId: String,
+    date: Date,
+  });
+
+  const db = new DynamoBlade({
+    client: DynamoDBDocumentClient.from(
+      new DynamoDBClient({
+        region: "us-east-1",
+        endpoint: "http://localhost:8000",
+      })
+    ),
+    schema: {
+      table: {
+        name: "test_db",
+        hashKey: "pk",
+        sortKey: "sk",
+        typeKey: "tk",
+        createdOn: "createdOn",
+        modifiedOn: "modifiedOn",
+      },
+      index: {
+        byType: {
+          type: "GLOBAL",
+          hashKey: "tk",
+          sortKey: "sk",
+        },
+      },
+      type: {
+        artist,
+        concert,
+      },
+    },
+  });
+
+  const test = await db
+    .open("artist")
+    .is("art001")
+    .open("album")
+    .is("alb001")
+    .open("song")
+    .is("s001")
+    .set({
+      $add: {
+        length: 1,
+      },
+    });
+
+  console.log(test);
 }
 
 main();

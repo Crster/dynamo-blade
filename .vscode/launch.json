@@ -6,11 +6,15 @@
   "configurations": [
     {
       "name": "Debug test cases",
+      "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/ts-node",
+      "runtimeArgs": [
+        "--transpile-only",
+        // if you use esm
+        "--esm"
+      ],
+      "program": "${workspaceFolder}/index.test.ts",
       "request": "launch",
-      "preLaunchTask": "npm: build",
-      "runtimeArgs": ["run-script", "test"],
-      "runtimeExecutable": "npm",
-      "skipFiles": ["<node_internals>/**"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "type": "node",
       "outputCapture": "std"
     }

@@ -1,121 +1,114 @@
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+export class PrimaryKeyConstructor {}
 
-export type BladeOperation = "ADD" | "GET" | "SET";
+export const PrimaryKey = new PrimaryKeyConstructor();
 
-export type BladeItemType =
+export type BasicType =
   | StringConstructor
   | NumberConstructor
   | BooleanConstructor
   | BufferConstructor
   | DateConstructor;
 
-export interface BladeKey {
-  field: string;
-  type: BladeItemType;
+export type ComplexType = ArrayConstructor | SetConstructor | MapConstructor;
+
+type FilterType<T, Filter> = T extends Filter ? true : false;
+
+export interface BladeSchema {
+  table: {
+    name: string;
+    hashKey: string;
+    sortKey: string;
+    typeKey: string;
+    createdOn?: string;
+    modifiedOn?: string;
+  };
+  type: Record<string, BladeType<any>>;
+  index?: Record<
+    string,
+    {
+      type: "LOCAL" | "GLOBAL";
+      hashKey?: string;
+      sortKey?: string;
+    }
+  >;
 }
 
-export interface DynamoBladeIndex {
-  hashKey?: BladeKey;
-  sortKey?: BladeKey;
-  type: "LOCAL" | "GLOBAL";
-  projection?: "ALL" | "KEYS" | Array<string>;
-  provision?: { read: number; write: number };
-}
-
-export interface BladeSchemaDefinition {
-  hashKey: BladeKey;
-  sortKey?: BladeKey;
-  createdOn?: boolean | string;
-  modifiedOn?: boolean | string;
-  index?: Record<string, DynamoBladeIndex>;
-}
-
-export interface DynamoBladeOption {
-  table: string;
+export interface BladeOption<Schema extends BladeSchema> {
   client: DynamoDBDocumentClient;
-  schema: BladeSchemaDefinition;
+  schema: Schema;
 }
 
-export type BladeCollectionType =
-  | ArrayConstructor
-  | SetConstructor
-  | MapConstructor;
+export type TypeFromBasicType<T extends BasicType> = T extends StringConstructor
+  ? string
+  : T extends NumberConstructor
+  ? number
+  : T extends BooleanConstructor
+  ? boolean
+  : T extends DateConstructor
+  ? Date
+  : T extends BufferConstructor
+  ? Buffer
+  : never;
 
-export interface BladeSchemaAttribute {
-  type: BladeItemType | BladeCollectionType;
-  itemType?: BladeItemType;
+export interface FieldType {
+  type: PrimaryKeyConstructor | BasicType | ComplexType;
+  itemType?: BasicType;
   required?: boolean;
-  value?: (operation: BladeOperation, value: any) => any;
+  default?: any;
 }
 
-export type BladeSchemaKey<Schema extends BladeSchema> = {
-  hashKey: (item: RequiredBladeItem<Schema>) => any;
-  sortKey?: (item: RequiredBladeItem<Schema>) => any;
-};
-
-export type BladeSchema = Record<string, BladeItemType | BladeSchemaAttribute>;
-
-export type TypeFromItemType<T extends BladeItemType> =
-  T extends StringConstructor
-    ? string
-    : T extends NumberConstructor
-    ? number
-    : T extends BooleanConstructor
-    ? boolean
-    : T extends DateConstructor
-    ? Date
-    : T extends BufferConstructor
-    ? Buffer
-    : never;
-
-export type TypeFromSchema<T extends BladeSchemaAttribute> =
+export type TypeFromFieldType<T extends FieldType> =
   T["type"] extends ArrayConstructor
-    ? Array<TypeFromItemType<T["itemType"]>>
+    ? Array<TypeFromBasicType<T["itemType"]>>
     : T["type"] extends SetConstructor
-    ? Set<TypeFromItemType<T["itemType"]>>
+    ? Set<TypeFromBasicType<T["itemType"]>>
     : T["type"] extends MapConstructor
-    ? Map<string, TypeFromItemType<T["itemType"]>>
-    : T["type"] extends BladeItemType
-    ? TypeFromItemType<T["type"]>
+    ? Map<string, TypeFromBasicType<T["itemType"]>>
+    : T["type"] extends BasicType
+    ? TypeFromBasicType<T["type"]>
     : never;
 
-export type BladeSchemaRequiredAttribute<T> = T extends BladeSchemaAttribute
-  ? T["required"] extends true
-    ? true
-    : false
-  : false;
-
-export type RequiredBladeItem<Schema extends BladeSchema> = {
-  [Key in keyof Schema as BladeSchemaRequiredAttribute<Schema[Key]> extends true
+export type BladeTypeField<Type> = {
+  [Key in keyof Type as FilterType<Type[Key], BladeType<any>> extends true
     ? Key
-    : never]: Schema[Key] extends BladeItemType
-    ? TypeFromItemType<Schema[Key]>
-    : Schema[Key] extends BladeSchemaAttribute
-    ? TypeFromSchema<Schema[Key]>
+    : never]: Type[Key];
+};
+
+export type BladeTypeAdd<Type> = {
+  [Key in keyof Type as FilterType<
+    Type[Key],
+    BasicType | ComplexType
+  > extends true
+    ? Key
+    : never]?: Type[Key] extends FieldType
+    ? TypeFromFieldType<Type[Key]>
+    : Type[Key] extends BasicType
+    ? TypeFromBasicType<Type[Key]>
     : never;
 };
 
-export type OptionalBladeItem<Schema extends BladeSchema> = {
-  [Key in keyof Schema as BladeSchemaRequiredAttribute<Schema[Key]> extends true
-    ? never
-    : Key]?: Schema[Key] extends BladeItemType
-    ? TypeFromItemType<Schema[Key]>
-    : Schema[Key] extends BladeSchemaAttribute
-    ? TypeFromSchema<Schema[Key]>
-    : never;
-};
+export type BladeTypeUpdate<Type> =
+  | BladeTypeAdd<Type>
+  | { $add: BladeTypeAdd<Type> }
+  | { $set: BladeTypeAdd<Type> }
+  | { $remove: Record<keyof Type, boolean> }
+  | { $delete: BladeTypeAdd<Type> };
 
-export type BladeItem<Schema extends BladeSchema> = OptionalBladeItem<Schema> &
-  RequiredBladeItem<Schema>;
+export class BladeType<
+  Type extends Record<
+    string,
+    PrimaryKeyConstructor | BasicType | FieldType | BladeType<any>
+  >
+> {
+  public readonly type: Type;
 
-export type UpdateBladeItem<Schema extends BladeSchema> =
-  | Partial<BladeItem<Schema>>
-  | { $add: Partial<BladeItem<Schema>> }
-  | { $set: Partial<BladeItem<Schema>> }
-  | { $remove: Record<keyof Schema, boolean> }
-  | { $delete: Partial<BladeItem<Schema>> };
+  constructor(type: Type) {
+    this.type = type;
+  }
+}
 
-export type ValueCondition =
+export type ValueFilter =
   | "="
   | "!="
   | ">"
@@ -126,7 +119,7 @@ export type ValueCondition =
   | "BEGINS_WITH"
   | "IN";
 
-export type DataCondtion =
+export type DataFilter =
   | "ATTRIBUTE_EXISTS"
   | "ATTRIBUTE_NOT_EXISTS"
   | "ATTRIBUTE_TYPE"
@@ -135,11 +128,8 @@ export type DataCondtion =
   | "SIZE_GT"
   | "SIZE_LT";
 
-export type BladeViewCondition = ValueCondition | DataCondtion;
-
-export type BladeViewField<Schema extends BladeSchema> = string & keyof (Schema & { HASH: any, SORT: any })
-
-export interface BladeResult<Schema> {
-  items: Array<Schema>;
-  next?: string;
-}
+export type Condition = {
+  field: string;
+  condition: ValueFilter | DataFilter;
+  value?: any;
+};

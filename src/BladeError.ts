@@ -1,14 +1,9 @@
-export enum BladeErrorCode {
-  Unknown = 0,
-  KeyNotSet = 1,
-  FieldIsRequired = 2,
-}
-
 export class BladeError extends Error {
-  public readonly code: BladeErrorCode;
+  public readonly reason: string;
 
-  constructor(code: BladeErrorCode, message: string) {
+  constructor(reason: string, message?: string) {
     super(message);
-    this.code = code;
+
+    this.reason = reason;
   }
 }
