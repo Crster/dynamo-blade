@@ -6,7 +6,10 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 async function main() {
   const song = new BladeType({
     songId: PrimaryKey,
-    title: String,
+    title: {
+      type: String,
+      required: true,
+    },
     length: Number,
   });
 
@@ -48,8 +51,8 @@ async function main() {
       index: {
         byType: {
           type: "GLOBAL",
-          hashKey: "tk",
-          sortKey: "sk",
+          hashKey: ["tk", "S"],
+          sortKey: ["sk", "S"],
         },
       },
       type: {
@@ -59,20 +62,9 @@ async function main() {
     },
   });
 
-  const test = await db
-    .open("artist")
-    .is("art001")
-    .open("album")
-    .is("alb001")
-    .open("song")
-    .is("s001")
-    .set({
-      $add: {
-        length: 1,
-      },
-    });
+  const test = await db.query("byType").where("tk", "=", "artist").get();
 
-  console.log(test);
+  console.log(test.items[0]);
 }
 
 main();

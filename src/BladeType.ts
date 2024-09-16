@@ -1,3 +1,4 @@
+import { OnDemandThroughput, Projection, ScalarAttributeType } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 export class PrimaryKeyConstructor {}
 
@@ -28,8 +29,10 @@ export interface BladeSchema {
     string,
     {
       type: "LOCAL" | "GLOBAL";
-      hashKey?: string;
-      sortKey?: string;
+      hashKey?: [string, ScalarAttributeType];
+      sortKey?: [string, ScalarAttributeType];
+      projection?: Projection
+      throughput?: OnDemandThroughput
     }
   >;
 }
@@ -85,7 +88,7 @@ export type BladeTypeAdd<Type> = {
     ? TypeFromFieldType<Type[Key]>
     : Type[Key] extends BasicType
     ? TypeFromBasicType<Type[Key]>
-    : never;
+    : string;
 };
 
 export type BladeTypeUpdate<Type> =
@@ -108,6 +111,43 @@ export class BladeType<
   }
 }
 
+export type BladeItem<Type> = {
+  [Key in keyof Type as FilterType<
+    Type[Key],
+    PrimaryKeyConstructor
+  > extends true
+    ? Key
+    : Type[Key] extends FieldType
+    ? Type[Key]["required"] extends true
+      ? Key
+      : never
+    : never]: Type[Key] extends FieldType
+    ? TypeFromFieldType<Type[Key]>
+    : Type[Key] extends BasicType
+    ? TypeFromBasicType<Type[Key]>
+    : string;
+} & {
+  [Key in keyof Type as FilterType<
+    Type[Key],
+    PrimaryKeyConstructor
+  > extends true
+    ? never
+    : Type[Key] extends FieldType
+    ? Type[Key]["required"] extends true
+      ? never
+      : Key
+    : Key]: Type[Key] extends FieldType
+    ? TypeFromFieldType<Type[Key]>
+    : Type[Key] extends BasicType
+    ? TypeFromBasicType<Type[Key]>
+    : string;
+};
+
+export interface BladeResult<Type> {
+  items: Array<Type>;
+  next?: string;
+}
+
 export type ValueFilter =
   | "="
   | "!="
@@ -116,10 +156,10 @@ export type ValueFilter =
   | "<"
   | "<="
   | "BETWEEN"
-  | "BEGINS_WITH"
-  | "IN";
+  | "BEGINS_WITH";
 
 export type DataFilter =
+  | "IN"
   | "ATTRIBUTE_EXISTS"
   | "ATTRIBUTE_NOT_EXISTS"
   | "ATTRIBUTE_TYPE"
@@ -127,9 +167,3 @@ export type DataFilter =
   | "SIZE"
   | "SIZE_GT"
   | "SIZE_LT";
-
-export type Condition = {
-  field: string;
-  condition: ValueFilter | DataFilter;
-  value?: any;
-};

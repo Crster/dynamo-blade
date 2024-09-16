@@ -1,3 +1,7 @@
+import {
+  AttributeDefinition,
+  ScalarAttributeType,
+} from "@aws-sdk/client-dynamodb";
 import { BladeError } from "./BladeError";
 import {
   BladeSchema,
@@ -10,14 +14,17 @@ import {
 export function getDbKey(schema: BladeSchema, keys: Array<string>) {
   const ret: Record<string, string> = {};
 
+  const sortIndex = schema.table.sortKey ? 2 : 0;
+  const keyList = keys.length % 2 ? [...keys, ""] : keys;
+
   if (schema.table.hashKey) {
     ret[schema.table.hashKey] = "";
 
-    for (let xx = 0; xx < keys.length - 2; xx++) {
+    for (let xx = 0; xx < keyList.length - sortIndex; xx++) {
       if ((xx + 1) % 2) {
-        ret[schema.table.hashKey] += `${keys[xx]}#`;
+        ret[schema.table.hashKey] += `${keyList[xx]}#`;
       } else {
-        ret[schema.table.hashKey] += `${keys[xx]}:`;
+        ret[schema.table.hashKey] += `${keyList[xx]}:`;
       }
     }
   }
@@ -30,11 +37,11 @@ export function getDbKey(schema: BladeSchema, keys: Array<string>) {
   if (schema.table.sortKey) {
     ret[schema.table.sortKey] = "";
 
-    for (let xx = keys.length - 2; xx < keys.length; xx++) {
+    for (let xx = keyList.length - sortIndex; xx < keyList.length; xx++) {
       if ((xx + 1) % 2) {
-        ret[schema.table.sortKey] += `${keys[xx]}#`;
+        ret[schema.table.sortKey] += `${keyList[xx]}#`;
       } else {
-        ret[schema.table.sortKey] += `${keys[xx]}:`;
+        ret[schema.table.sortKey] += `${keyList[xx]}:`;
       }
     }
 
@@ -86,16 +93,19 @@ export function getDbExtra(
   return ret;
 }
 
-export function getDbValue(
+export function getDbValue<Schema>(
   schema: BladeSchema,
   keys: Array<string>,
   value: Record<string, any>
 ) {
   const ret = new Map<string, any>();
+  let dataType: string;
+
   let currentSchema = schema.type as Record<string, any>;
   for (let xx = 0; xx < keys.length; xx++) {
     if ((xx + 1) % 2) {
-      currentSchema = currentSchema[keys[xx]].type;
+      dataType = keys[xx];
+      currentSchema = currentSchema[dataType].type;
     }
   }
 
@@ -106,11 +116,26 @@ export function getDbValue(
     } else if (val !== undefined) {
       ret.set(k, val);
     } else if (currentSchema[k]["required"]) {
-      throw new BladeError("REQUIRED", `${k} must have a value`);
+      throw new BladeError("REQUIRED", `${dataType}.${k} must have a value`);
     }
   }
 
-  return Object.fromEntries(ret);
+  return Object.fromEntries(ret) as Schema;
+}
+
+export function getPrimaryKeyField(schema: BladeSchema, keys: Array<string>) {
+  let currentSchema = schema.type as Record<string, any>;
+  for (let xx = 0; xx < keys.length; xx++) {
+    if ((xx + 1) % 2) {
+      currentSchema = currentSchema[keys[xx]].type;
+    }
+  }
+
+  for (const k in currentSchema) {
+    if (currentSchema[k] instanceof PrimaryKeyConstructor) {
+      return k;
+    }
+  }
 }
 
 export function getUpdateData<Schema extends BladeSchema>(
@@ -261,7 +286,7 @@ export function getCondition(
     case "BEGINS_WITH":
       ret.filter.push(`begins_with(#field${counter}, :value${counter})`);
       ret.field[`#field${counter}`] = field;
-      ret.values[`:value${counter}`] = value.at(0);
+      ret.values[`:value${counter}`] = value;
       break;
     case "ATTRIBUTE_EXISTS":
       ret.filter.push(`attribute_exists(#field${counter})`);
@@ -274,31 +299,37 @@ export function getCondition(
     case "ATTRIBUTE_TYPE":
       ret.filter.push(`attribute_type(#field${counter}, :value${counter})`);
       ret.field[`#field${counter}`] = field;
-      ret.values[`:value${counter}`] = value.at(0);
+      ret.values[`:value${counter}`] = value;
       break;
     case "CONTAINS":
       ret.filter.push(`contains(#field${counter}, :value${counter})`);
       ret.field[`#field${counter}`] = field;
-      ret.values[`:value${counter}`] = value.at(0);
+      ret.values[`:value${counter}`] = value;
       break;
     case "SIZE":
       ret.filter.push(`size(#field${counter}) = :value${counter}`);
       ret.field[`#field${counter}`] = field;
-      ret.values[`:value${counter}`] = value.at(0);
+      ret.values[`:value${counter}`] = value;
       break;
     case "SIZE_GT":
       ret.filter.push(`size(#field${counter}) < :value${counter}`);
       ret.field[`#field${counter}`] = field;
-      ret.values[`:value${counter}`] = value.at(0);
+      ret.values[`:value${counter}`] = value;
       break;
     case "SIZE_LT":
       ret.filter.push(`size(#field${counter}) > :value${counter}`);
       ret.field[`#field${counter}`] = field;
-      ret.values[`:value${counter}`] = value.at(0);
+      ret.values[`:value${counter}`] = value;
       break;
   }
 
   return ret;
+}
+
+export function fillMap(map: Map<string, any>, record: Record<string, any>) {
+  for (const k in record) {
+    map.set(k, record[k]);
+  }
 }
 
 export function decodeNext(next: string) {
@@ -314,5 +345,18 @@ export function decodeNext(next: string) {
 export function encodeNext(next: any) {
   if (next) {
     return Buffer.from(JSON.stringify(next)).toString("base64");
+  }
+}
+
+export function addToAttributeDefinition(
+  attributes: Array<AttributeDefinition>,
+  name: string,
+  type: ScalarAttributeType
+) {
+  if (!attributes.find((ii) => ii.AttributeName === name)) {
+    attributes.push({
+      AttributeName: name,
+      AttributeType: type,
+    });
   }
 }

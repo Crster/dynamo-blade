@@ -12,6 +12,7 @@ import {
   BladeTypeAdd,
   BladeTypeField,
   BladeTypeUpdate,
+  BladeItem,
 } from "./BladeType";
 import {
   getDbKey,
@@ -19,8 +20,6 @@ import {
   getDbValue,
   getUpdateData,
 } from "./BladeUtility";
-import { ProvisionedThroughputExceededException } from "@aws-sdk/client-dynamodb";
-import { BladeError } from "./BladeError";
 
 export class BladeDocument<
   Schema extends BladeSchema,
@@ -57,7 +56,11 @@ export class BladeDocument<
 
   async add(value: BladeTypeAdd<Type["type"]>) {
     const data = {
-      ...getDbValue(this.option.schema, this.key, value),
+      ...getDbValue<BladeItem<Type["type"]>>(
+        this.option.schema,
+        this.key,
+        value
+      ),
       ...getDbKey(this.option.schema, this.key),
       ...getDbExtra(this.option.schema, this.key, "ADD"),
     };
