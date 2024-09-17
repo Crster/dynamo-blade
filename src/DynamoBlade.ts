@@ -5,11 +5,11 @@ import {
   GlobalSecondaryIndex,
   KeySchemaElement,
 } from "@aws-sdk/client-dynamodb";
-import BladeCollection from "./BladeCollection";
-import { BladeOption, BladeSchema, BladeTypeField } from "./BladeType";
-import BladeView from "./BladeView";
+import { BladeView } from "./BladeView";
 import { BladeError } from "./BladeError";
+import { BladeCollection } from "./BladeCollection";
 import { addToAttributeDefinition } from "./BladeUtility";
+import { BladeOption, BladeSchema, BladeTypeField } from "./BladeType";
 
 export default class DynamoBlade<Schema extends BladeSchema> {
   public readonly option: BladeOption<Schema>;
@@ -81,7 +81,11 @@ export default class DynamoBlade<Schema extends BladeSchema> {
 
         globalIndex.push({
           IndexName: indexName,
-          Projection: index.projection,
+          Projection: index.projection ?? { ProjectionType: "ALL" },
+          ProvisionedThroughput:
+            billingMode === "PROVISIONED"
+              ? { ReadCapacityUnits: 20, WriteCapacityUnits: 10 }
+              : undefined,
           OnDemandThroughput: index.throughput,
           KeySchema: globalKeySchema,
         });
@@ -108,7 +112,7 @@ export default class DynamoBlade<Schema extends BladeSchema> {
 
         localIndex.push({
           IndexName: indexName,
-          Projection: index.projection,
+          Projection: index.projection ?? { ProjectionType: "ALL" },
           OnDemandThroughput: index.throughput,
           KeySchema: localKeySchema,
         });
@@ -119,6 +123,10 @@ export default class DynamoBlade<Schema extends BladeSchema> {
       TableName: this.option.schema.table.name,
       KeySchema: keySchema,
       AttributeDefinitions: attributes,
+      ProvisionedThroughput:
+        billingMode === "PROVISIONED"
+          ? { ReadCapacityUnits: 20, WriteCapacityUnits: 10 }
+          : undefined,
       LocalSecondaryIndexes: localIndex.length ? localIndex : undefined,
       GlobalSecondaryIndexes: globalIndex.length ? globalIndex : undefined,
       BillingMode: billingMode,

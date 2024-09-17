@@ -1,70 +1,116 @@
-import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { BladeType, PrimaryKey } from "./src/BladeType";
-import DynamoBlade from "./src/DynamoBlade";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { BladeResult } from "./src/BladeType";
+import { db } from "./test/db";
 
-async function main() {
-  const song = new BladeType({
-    songId: PrimaryKey,
-    title: {
-      type: String,
-      required: true,
-    },
-    length: Number,
-  });
+test("test init", async () => {
+  const result = await db.init();
+  expect(result).toBe(true);
+});
 
-  const album = new BladeType({
-    albumId: PrimaryKey,
-    title: String,
-    song,
-  });
+test("test add artist", async () => {
+  const result = await db
+    .open("artist")
+    .is("akon")
+    .add({
+      name: "Akon Tiam",
+      age: 50,
+      genres: new Set(["rnb", "pop"]),
+    });
 
-  const artist = new BladeType({
-    artistId: PrimaryKey,
-    name: String,
-    age: String,
-    album,
-  });
+  expect(result).toBe(true);
+});
 
-  const concert = new BladeType({
-    concertId: PrimaryKey,
-    artistId: String,
-    date: Date,
-  });
+test("test get artist", async () => {
+  const result = await db.open("artist").is("akon").get();
 
-  const db = new DynamoBlade({
-    client: DynamoDBDocumentClient.from(
-      new DynamoDBClient({
-        region: "us-east-1",
-        endpoint: "http://localhost:8000",
-      })
-    ),
-    schema: {
-      table: {
-        name: "test_db",
-        hashKey: "pk",
-        sortKey: "sk",
-        typeKey: "tk",
-        createdOn: "createdOn",
-        modifiedOn: "modifiedOn",
+  expect(result?.artistId).toBe("akon");
+});
+
+test("test update artist", async () => {
+  await db
+    .open("artist")
+    .is("akon")
+    .set({
+      name: "Badara Akon Thiam",
+      $set: {
+        age: 51,
       },
-      index: {
-        byType: {
-          type: "GLOBAL",
-          hashKey: ["tk", "S"],
-          sortKey: ["sk", "S"],
-        },
+      $add: {
+        genres: new Set(["hip hop"]),
       },
-      type: {
-        artist,
-        concert,
-      },
-    },
+    });
+
+  const result = await db.open("artist").is("akon").get(true);
+
+  expect(result).toMatchObject({
+    name: "Badara Akon Thiam",
+    age: 51,
+    genres: new Set(["rnb", "pop", "hip hop"]),
   });
+});
 
-  const test = await db.query("byType").where("tk", "=", "artist").get();
+test("test add album and song", async () => {
+  let success = false;
+  const album = db.open("artist").is("akon").open("album");
 
-  console.log(test.items[0]);
-}
+  success = await album.is("trouble").add({
+    releaseDate: new Date(2007, 1),
+    title: "Trouble",
+  });
+  expect(success).toBe(true);
 
-main();
+  success = await album.is("konvicted").add({ releaseDate: new Date(2006, 2) });
+  expect(success).toBe(true);
+
+  success = await album
+    .is("konvicted")
+    .open("song")
+    .is("smackthat")
+    .set({
+      title: "Smack That",
+      collab: ["Eminem"],
+      downloadable: false,
+      length: 3.33,
+    });
+  expect(success).toBe(true);
+
+  success = await album
+    .is("konvicted")
+    .open("song")
+    .is("icw")
+    .set({
+      title: "I Can't Wait",
+      collab: ["T-Pain"],
+      downloadable: true,
+      length: 3.46,
+    });
+
+  expect(success).toBe(true);
+});
+
+test("test query", async () => {
+  let result: BladeResult<any>;
+
+  result = await db
+    .open("artist")
+    .is("akon")
+    .open("album")
+    .where("albumId", "BEGINS_WITH", "tr")
+    .get();
+
+  expect(result.items.length).toBe(1);
+
+  result = await db
+    .open("artist")
+    .where("artistId", "=", "akon")
+    .where("genres", "CONTAINS", "hip hop")
+    .get();
+
+  expect(result.items[0]).toMatchObject({
+    artistId: "akon",
+  });
+});
+
+test("test query index byType", async () => {
+  const result = await db.query("byType").where("tk", "=", "song").get();
+  expect(result.items.length).toBe(2);
+});

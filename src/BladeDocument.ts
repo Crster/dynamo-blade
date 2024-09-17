@@ -4,22 +4,23 @@ import {
   PutCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
-import BladeCollection from "./BladeCollection";
 import {
   BladeOption,
   BladeSchema,
   BladeType,
-  BladeTypeAdd,
   BladeTypeField,
   BladeTypeUpdate,
   BladeItem,
+  BladeTypeAdd,
 } from "./BladeType";
 import {
   getDbKey,
   getDbExtra,
   getDbValue,
   getUpdateData,
+  fromDbValue,
 } from "./BladeUtility";
+import { BladeCollection } from "./BladeCollection";
 
 export class BladeDocument<
   Schema extends BladeSchema,
@@ -50,13 +51,17 @@ export class BladeDocument<
     const result = await this.option.client.send(command);
 
     if (result.$metadata.httpStatusCode === 200) {
-      return getDbValue(this.option.schema, this.key, result.Item);
+      return fromDbValue<BladeItem<Type["type"]>>(
+        this.option.schema,
+        this.key,
+        result.Item
+      );
     }
   }
 
   async add(value: BladeTypeAdd<Type["type"]>) {
     const data = {
-      ...getDbValue<BladeItem<Type["type"]>>(
+      ...getDbValue<BladeTypeAdd<Type["type"]>>(
         this.option.schema,
         this.key,
         value

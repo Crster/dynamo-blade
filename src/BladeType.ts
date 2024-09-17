@@ -1,8 +1,17 @@
-import { OnDemandThroughput, Projection, ScalarAttributeType } from "@aws-sdk/client-dynamodb";
+import {
+  OnDemandThroughput,
+  Projection,
+  ScalarAttributeType,
+} from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-export class PrimaryKeyConstructor {}
 
-export const PrimaryKey = new PrimaryKeyConstructor();
+export interface PrimaryKeyConstructor {
+  new ();
+  readonly prototype: "PrimaryKey";
+}
+export class PrimaryKeyConstructor implements PrimaryKeyConstructor {}
+
+export var PrimaryKey = new PrimaryKeyConstructor();
 
 export type BasicType =
   | StringConstructor
@@ -12,8 +21,6 @@ export type BasicType =
   | DateConstructor;
 
 export type ComplexType = ArrayConstructor | SetConstructor | MapConstructor;
-
-type FilterType<T, Filter> = T extends Filter ? true : false;
 
 export interface BladeSchema {
   table: {
@@ -31,8 +38,8 @@ export interface BladeSchema {
       type: "LOCAL" | "GLOBAL";
       hashKey?: [string, ScalarAttributeType];
       sortKey?: [string, ScalarAttributeType];
-      projection?: Projection
-      throughput?: OnDemandThroughput
+      projection?: Projection;
+      throughput?: OnDemandThroughput;
     }
   >;
 }
@@ -73,51 +80,20 @@ export type TypeFromFieldType<T extends FieldType> =
     : never;
 
 export type BladeTypeField<Type> = {
-  [Key in keyof Type as FilterType<Type[Key], BladeType<any>> extends true
-    ? Key
-    : never]: Type[Key];
-};
-
-export type BladeTypeAdd<Type> = {
-  [Key in keyof Type as FilterType<
-    Type[Key],
-    BasicType | ComplexType
-  > extends true
-    ? Key
-    : never]?: Type[Key] extends FieldType
-    ? TypeFromFieldType<Type[Key]>
-    : Type[Key] extends BasicType
-    ? TypeFromBasicType<Type[Key]>
-    : string;
-};
-
-export type BladeTypeUpdate<Type> =
-  | BladeTypeAdd<Type>
-  | { $add: BladeTypeAdd<Type> }
-  | { $set: BladeTypeAdd<Type> }
-  | { $remove: Record<keyof Type, boolean> }
-  | { $delete: BladeTypeAdd<Type> };
-
-export class BladeType<
-  Type extends Record<
+  [Key in keyof Type as Type[Key] extends BladeType<any> ? Key : never]: Record<
     string,
-    PrimaryKeyConstructor | BasicType | FieldType | BladeType<any>
-  >
-> {
-  public readonly type: Type;
+    any
+  >;
+};
 
-  constructor(type: Type) {
-    this.type = type;
-  }
-}
-
-export type BladeItem<Type> = {
-  [Key in keyof Type as FilterType<
-    Type[Key],
-    PrimaryKeyConstructor
-  > extends true
+export type BladeTypePrimary<Type> = {
+  [Key in keyof Type as Type[Key] extends PrimaryKeyConstructor
     ? Key
-    : Type[Key] extends FieldType
+    : never]: string;
+};
+
+export type RequiredBladeItem<Type> = {
+  [Key in keyof Type as Type[Key] extends FieldType
     ? Type[Key]["required"] extends true
       ? Key
       : never
@@ -126,22 +102,58 @@ export type BladeItem<Type> = {
     : Type[Key] extends BasicType
     ? TypeFromBasicType<Type[Key]>
     : string;
-} & {
-  [Key in keyof Type as FilterType<
-    Type[Key],
-    PrimaryKeyConstructor
-  > extends true
-    ? never
-    : Type[Key] extends FieldType
+};
+
+export type OptionalBladeItem<Type> = {
+  [Key in keyof Type as Type[Key] extends FieldType
     ? Type[Key]["required"] extends true
       ? never
       : Key
-    : Key]: Type[Key] extends FieldType
+    : Type[Key] extends BasicType
+    ? Key
+    : never]?: Type[Key] extends FieldType
     ? TypeFromFieldType<Type[Key]>
     : Type[Key] extends BasicType
     ? TypeFromBasicType<Type[Key]>
     : string;
 };
+
+export type BladeItem<Type> = OptionalBladeItem<Type> &
+  RequiredBladeItem<Type> &
+  BladeTypePrimary<Type>;
+
+export type BladeTypeAdd<Type> = OptionalBladeItem<Type> &
+  RequiredBladeItem<Type>;
+
+export type BladeTypeUpdate<Type> =
+  | Partial<BladeTypeAdd<Type>>
+  | { $add: Partial<BladeTypeAdd<Type>> }
+  | { $set: Partial<BladeTypeAdd<Type>> }
+  | { $remove: Record<keyof Type, boolean> }
+  | { $delete: Partial<BladeTypeAdd<Type>> };
+
+export interface BladeType<
+  Type extends Record<
+    string,
+    PrimaryKeyConstructor | BasicType | FieldType | BladeType<any>
+  >
+> {
+  new ();
+  readonly prototype: "BladeType";
+}
+export class BladeType<
+  Type extends Record<
+    string,
+    PrimaryKeyConstructor | BasicType | FieldType | BladeType<any>
+  >
+> implements BladeType<any>
+{
+  public readonly type: Type;
+
+  constructor(type: Type) {
+    this.type = type;
+  }
+}
 
 export interface BladeResult<Type> {
   items: Array<Type>;

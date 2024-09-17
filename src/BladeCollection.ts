@@ -1,8 +1,8 @@
+import { BladeView } from "./BladeView";
 import { BladeDocument } from "./BladeDocument";
-import { BladeOption, BladeSchema, BladeType, ValueFilter } from "./BladeType";
-import BladeView from "./BladeView";
+import { BladeOption, BladeSchema, BladeType, ValueFilter, DataFilter, BladeTypePrimary } from './BladeType';
 
-export default class BladeCollection<
+export class BladeCollection<
   Schema extends BladeSchema,
   Type extends BladeType<any>
 > {
@@ -19,7 +19,7 @@ export default class BladeCollection<
   }
 
   where(
-    field: string & keyof Type["type"],
+    field: string & keyof BladeTypePrimary<Type["type"]>,
     condition: ValueFilter,
     value: any
   ) {

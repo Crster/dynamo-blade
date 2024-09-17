@@ -2,53 +2,80 @@ import {
   AttributeDefinition,
   ScalarAttributeType,
 } from "@aws-sdk/client-dynamodb";
-import { BladeError } from "./BladeError";
 import {
   BladeSchema,
+  BladeType,
   BladeTypeUpdate,
   DataFilter,
   PrimaryKeyConstructor,
   ValueFilter,
 } from "./BladeType";
+import { BladeError } from "./BladeError";
 
-export function getDbKey(schema: BladeSchema, keys: Array<string>) {
+export function getDbKey(
+  schema: BladeSchema,
+  keys: Array<string>,
+  index?: string
+) {
   const ret: Record<string, string> = {};
 
-  const sortIndex = schema.table.sortKey ? 2 : 0;
-  const keyList = keys.length % 2 ? [...keys, ""] : keys;
+  if (keys && keys.length) {
+    let hashKey = schema.table.hashKey;
+    let sortKey = schema.table.sortKey;
 
-  if (schema.table.hashKey) {
-    ret[schema.table.hashKey] = "";
+    if (index) {
+      hashKey = undefined;
+      sortKey = undefined;
 
-    for (let xx = 0; xx < keyList.length - sortIndex; xx++) {
-      if ((xx + 1) % 2) {
-        ret[schema.table.hashKey] += `${keyList[xx]}#`;
-      } else {
-        ret[schema.table.hashKey] += `${keyList[xx]}:`;
-      }
-    }
-  }
-
-  ret[schema.table.hashKey] = ret[schema.table.hashKey].slice(
-    0,
-    ret[schema.table.hashKey].length - 1
-  );
-
-  if (schema.table.sortKey) {
-    ret[schema.table.sortKey] = "";
-
-    for (let xx = keyList.length - sortIndex; xx < keyList.length; xx++) {
-      if ((xx + 1) % 2) {
-        ret[schema.table.sortKey] += `${keyList[xx]}#`;
-      } else {
-        ret[schema.table.sortKey] += `${keyList[xx]}:`;
+      const indexSchema = schema.index[index];
+      if (indexSchema) {
+        if (indexSchema.type === "LOCAL") {
+          hashKey = schema.table.hashKey;
+        } else {
+          if (indexSchema.hashKey) {
+            hashKey = indexSchema.hashKey[0];
+          }
+        }
+        if (indexSchema.sortKey) {
+          sortKey = indexSchema.sortKey[0];
+        }
       }
     }
 
-    ret[schema.table.sortKey] = ret[schema.table.sortKey].slice(
-      0,
-      ret[schema.table.sortKey].length - 1
-    );
+    const sortIndex = sortKey ? 2 : 0;
+    const keyList = keys.length % 2 ? [...keys, ""] : keys;
+
+    if (hashKey) {
+      ret[hashKey] = "";
+
+      for (let xx = 0; xx < keyList.length - sortIndex; xx++) {
+        if ((xx + 1) % 2) {
+          ret[hashKey] += `${keyList[xx]}#`;
+        } else {
+          ret[hashKey] += `${keyList[xx]}:`;
+        }
+      }
+    }
+
+    ret[hashKey] = ret[hashKey].slice(0, ret[hashKey].length - 1);
+
+    if (sortKey) {
+      ret[sortKey] = "";
+
+      for (let xx = keyList.length - sortIndex; xx < keyList.length; xx++) {
+        if ((xx + 1) % 2) {
+          ret[sortKey] += `${keyList[xx]}#`;
+        } else {
+          ret[sortKey] += `${keyList[xx]}:`;
+        }
+      }
+
+      ret[sortKey] = ret[sortKey].slice(0, ret[sortKey].length - 1);
+    }
+
+    if (!ret[hashKey] && ret[sortKey]) {
+      ret[hashKey] = ret[sortKey];
+    }
   }
 
   return ret;
@@ -61,33 +88,33 @@ export function getDbExtra(
 ) {
   const ret: Record<string, string> = {};
 
-  if (operation === "ADD") {
-    let dataType: string;
-    let currentSchema = schema.type as Record<string, any>;
-    for (let xx = 0; xx < keys.length; xx++) {
-      if ((xx + 1) % 2) {
-        dataType = keys[xx];
-        currentSchema = currentSchema[dataType].type;
-        for (const k in currentSchema) {
-          if (currentSchema[k] instanceof PrimaryKeyConstructor) {
-            ret[k] = keys[xx + 1];
-            break;
-          }
+  let dataType: string;
+  let currentSchema = schema.type as Record<string, any>;
+  for (let xx = 0; xx < keys.length; xx++) {
+    if ((xx + 1) % 2) {
+      dataType = keys[xx];
+      currentSchema = currentSchema[dataType].type;
+      for (const k in currentSchema) {
+        if (currentSchema[k] instanceof PrimaryKeyConstructor) {
+          ret[k] = keys[xx + 1];
+          break;
         }
       }
     }
+  }
 
-    if (schema.table.createdOn) {
-      ret[schema.table.createdOn] = new Date().toISOString();
-    }
-
-    if (schema.table.typeKey) {
-      ret[schema.table.typeKey] = dataType;
-    }
+  if (schema.table.typeKey) {
+    ret[schema.table.typeKey] = dataType;
   }
 
   if (schema.table.modifiedOn) {
     ret[schema.table.modifiedOn] = new Date().toISOString();
+  }
+
+  if (operation === "ADD") {
+    if (schema.table.createdOn) {
+      ret[schema.table.createdOn] = new Date().toISOString();
+    }
   }
 
   return ret;
@@ -114,9 +141,72 @@ export function getDbValue<Schema>(
     if (currentSchema[k] instanceof PrimaryKeyConstructor) {
       continue;
     } else if (val !== undefined) {
-      ret.set(k, val);
+      if (val instanceof Date) {
+        ret.set(k, val.toISOString());
+      } else {
+        ret.set(k, val);
+      }
     } else if (currentSchema[k]["required"]) {
       throw new BladeError("REQUIRED", `${dataType}.${k} must have a value`);
+    }
+  }
+
+  return Object.fromEntries(ret) as Schema;
+}
+
+export function getDbUpdateValue<Schema>(
+  schema: BladeSchema,
+  keys: Array<string>,
+  value: Record<string, any>
+) {
+  const ret = new Map<string, any>();
+  let dataType: string;
+
+  let currentSchema = schema.type as Record<string, any>;
+  for (let xx = 0; xx < keys.length; xx++) {
+    if ((xx + 1) % 2) {
+      dataType = keys[xx];
+      currentSchema = currentSchema[dataType].type;
+    }
+  }
+
+  const schemaKeys = Object.keys(currentSchema);
+  for (const k in value) {
+    if (schemaKeys.includes(k)) {
+      const val = value[k] ?? currentSchema[k]["default"];
+      if (currentSchema[k] instanceof PrimaryKeyConstructor) {
+        continue;
+      } else if (val !== undefined) {
+        ret.set(k, val);
+      }
+    }
+  }
+
+  return Object.fromEntries(ret) as Schema;
+}
+
+export function fromDbValue<Schema>(
+  schema: BladeSchema,
+  keys: Array<string>,
+  value: Record<string, any>
+) {
+  const ret = new Map<string, any>();
+  let dataType: string;
+
+  let currentSchema = schema.type as Record<string, any>;
+  for (let xx = 0; xx < keys.length; xx++) {
+    if ((xx + 1) % 2) {
+      dataType = keys[xx];
+      currentSchema = currentSchema[dataType].type;
+    }
+  }
+
+  for (const k in currentSchema) {
+    if (currentSchema[k] instanceof BladeType) continue;
+
+    const val = value[k] ?? currentSchema[k]["default"];
+    if (val !== undefined) {
+      ret.set(k, val);
     }
   }
 
@@ -141,7 +231,7 @@ export function getPrimaryKeyField(schema: BladeSchema, keys: Array<string>) {
 export function getUpdateData<Schema extends BladeSchema>(
   schema: Schema,
   keys: Array<string>,
-  value: BladeTypeUpdate<Schema>
+  value: BladeTypeUpdate<any>
 ) {
   const updateExpression: Array<string> = [];
   const attributeName = new Map<string, string>();
@@ -158,7 +248,7 @@ export function getUpdateData<Schema extends BladeSchema>(
         setValue = { ...setValue, ...value[key] };
         break;
       case "$add":
-        subValue = getDbValue(schema, keys, value[key]);
+        subValue = getDbUpdateValue(schema, keys, value[key]);
         for (const subKey in subValue) {
           field.add.push(`#prop${field.counter} :value${field.counter}`);
           attributeName.set(`#prop${field.counter}`, subKey);
@@ -167,7 +257,7 @@ export function getUpdateData<Schema extends BladeSchema>(
         }
         break;
       case "$remove":
-        subValue = getDbValue(schema, keys, value[key]);
+        subValue = getDbUpdateValue(schema, keys, value[key]);
         for (const subKey in subValue) {
           field.remove.push(`#prop${field.counter}`);
           attributeName.set(`#prop${field.counter}`, subValue[subKey]);
@@ -176,7 +266,7 @@ export function getUpdateData<Schema extends BladeSchema>(
 
         break;
       case "$delete":
-        subValue = getDbValue(schema, keys, value[key]);
+        subValue = getDbUpdateValue(schema, keys, value[key]);
         for (const subKey in subValue) {
           field.delete.push(`#prop${field.counter} :value${field.counter}`);
           attributeName.set(`#prop${field.counter}`, subKey);
@@ -191,7 +281,7 @@ export function getUpdateData<Schema extends BladeSchema>(
   }
 
   setValue = {
-    ...getDbValue(schema, keys, setValue),
+    ...getDbUpdateValue(schema, keys, setValue),
     ...getDbExtra(schema, keys, "UPDATE"),
   };
   for (const key in setValue) {

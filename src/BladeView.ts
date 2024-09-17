@@ -12,16 +12,16 @@ import {
   decodeNext,
   encodeNext,
   fillMap,
+  fromDbValue,
   getCondition,
   getDbKey,
-  getDbValue,
   getPrimaryKeyField,
 } from "./BladeUtility";
 
 type QueryType = "QUERY" | "SCAN";
 type Conjunctions = "AND" | "OR";
 
-export default class BladeView<
+export class BladeView<
   Schema extends BladeSchema,
   Type extends BladeType<any>
 > {
@@ -35,7 +35,7 @@ export default class BladeView<
     value: any;
     conjunction: Conjunctions;
   }>;
-  private readonly primaryKeyField: string;
+  private primaryKeyField: string;
 
   constructor(
     option: BladeOption<Schema>,
@@ -54,7 +54,7 @@ export default class BladeView<
   }
 
   where(
-    field: string & keyof Type["type"],
+    field: string & keyof BladeItem<Type["type"]>,
     condition: ValueFilter | DataFilter,
     value: any
   ) {
@@ -63,7 +63,7 @@ export default class BladeView<
   }
 
   and(
-    field: string & keyof Type["type"],
+    field: string & keyof BladeItem<Type["type"]>,
     condition: ValueFilter | DataFilter,
     value: any
   ) {
@@ -72,7 +72,7 @@ export default class BladeView<
   }
 
   or(
-    field: string & keyof Type["type"],
+    field: string & keyof BladeItem<Type["type"]>,
     condition: ValueFilter | DataFilter,
     value: any
   ) {
@@ -89,10 +89,12 @@ export default class BladeView<
   }
 
   private _generatePrimaryKeyValue(value: any, primaryKeyValue: string) {
+    const pk = primaryKeyValue ?? "";
+
     if (Array.isArray(value)) {
-      return value.map((ii) => primaryKeyValue + String(ii));
+      return value.map((ii) => pk + String(ii ?? ""));
     } else {
-      return primaryKeyValue + String(value);
+      return pk + String(value ?? "");
     }
   }
 
@@ -100,22 +102,60 @@ export default class BladeView<
     const ret: BladeResult<BladeItem<Type["type"]>> = { items: [] };
     let counter = 0;
 
+    let hashKey = this.option.schema.table.hashKey;
+    let sortKey = this.option.schema.table.sortKey;
+
     const filterExpressionAnd: Array<string> = [];
     const filterExpressionOr: Array<string> = [];
     const keyConditionExpression: Array<string> = [];
     const expressionAttributeNames = new Map<string, string>();
     const expressionAttributeValues = new Map<string, any>();
 
+    if (this.index) {
+      hashKey = undefined;
+      sortKey = undefined;
+
+      const indexSchema = this.option.schema.index[this.index];
+      if (indexSchema) {
+        if (indexSchema.type === "LOCAL") {
+          hashKey = this.option.schema.table.hashKey;
+        } else {
+          if (indexSchema.hashKey) {
+            hashKey = indexSchema.hashKey[0];
+          }
+        }
+        if (indexSchema.sortKey) {
+          sortKey = indexSchema.sortKey[0];
+        }
+      }
+
+      if (hashKey && !sortKey) {
+        this.primaryKeyField = hashKey;
+      } else if (sortKey) {
+        this.primaryKeyField = sortKey;
+      }
+    }
+
     const primaryCondition = this.conditions.find(
       (ii) => ii.field === this.primaryKeyField && ii.conjunction === "AND"
     );
 
-    let dbKey = getDbKey(this.option.schema, this.key);
-    if (this.option.schema.table.hashKey && this.option.schema.table.sortKey) {
+    let dbKey = this.index
+      ? this.conditions.reduce((p, c) => {
+          p[c.field] = c.value;
+          return p;
+        }, {})
+      : getDbKey(this.option.schema, this.key, this.index);
+    if (hashKey && sortKey) {
       const condition = getCondition(
-        this.option.schema.table.hashKey,
+        hashKey,
         "=",
-        dbKey[this.option.schema.table.hashKey],
+        this.key.length > 2
+          ? dbKey[hashKey]
+          : this._generatePrimaryKeyValue(
+              primaryCondition?.value,
+              dbKey[hashKey]
+            ),
         counter
       );
       keyConditionExpression.push(...condition.filter);
@@ -126,12 +166,9 @@ export default class BladeView<
 
       if (primaryCondition) {
         const condition = getCondition(
-          this.option.schema.table.sortKey,
+          sortKey,
           primaryCondition.condition,
-          this._generatePrimaryKeyValue(
-            primaryCondition.value,
-            dbKey[this.option.schema.table.sortKey]
-          ),
+          this._generatePrimaryKeyValue(primaryCondition.value, dbKey[sortKey]),
           counter
         );
         keyConditionExpression.push(...condition.filter);
@@ -143,12 +180,9 @@ export default class BladeView<
     } else {
       if (primaryCondition) {
         const condition = getCondition(
-          this.option.schema.table.sortKey,
+          sortKey,
           primaryCondition.condition,
-          this._generatePrimaryKeyValue(
-            primaryCondition.value,
-            dbKey[this.option.schema.table.sortKey]
-          ),
+          this._generatePrimaryKeyValue(primaryCondition.value, dbKey[sortKey]),
           counter
         );
         keyConditionExpression.push(...condition.filter);
@@ -157,12 +191,7 @@ export default class BladeView<
 
         counter++;
       } else {
-        const condition = getCondition(
-          this.option.schema.table.hashKey,
-          "=",
-          dbKey[this.option.schema.table.hashKey],
-          counter
-        );
+        const condition = getCondition(hashKey, "=", dbKey[hashKey], counter);
         keyConditionExpression.push(...condition.filter);
         fillMap(expressionAttributeNames, condition.field);
         fillMap(expressionAttributeValues, condition.values);
@@ -174,6 +203,8 @@ export default class BladeView<
     let filterExpression: string;
     for (const condi of this.conditions) {
       if (condi === primaryCondition) continue;
+      if (condi.field === hashKey) continue;
+      if (condi.field === sortKey) continue;
 
       const condition = getCondition(
         condi.field,
@@ -225,7 +256,7 @@ export default class BladeView<
     const result = await this.option.client.send(command);
 
     for (const ii of result.Items) {
-      ret.items.push(getDbValue(this.option.schema, this.key, ii));
+      ret.items.push(fromDbValue(this.option.schema, this.key, ii));
     }
 
     if (result.LastEvaluatedKey) {
@@ -288,7 +319,7 @@ export default class BladeView<
     const result = await this.option.client.send(command);
 
     for (const ii of result.Items) {
-      ret.items.push(getDbValue(this.option.schema, this.key, ii));
+      ret.items.push(fromDbValue(this.option.schema, this.key, ii));
     }
 
     if (result.LastEvaluatedKey) {

@@ -5,15 +5,20 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug test cases",
+      "name": "Debug index.test.ts",
       "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/ts-node",
-      "runtimeArgs": [
-        "--transpile-only",
-        // if you use esm
-        "--esm"
-      ],
+      "runtimeArgs": ["--transpile-only", "--esm"],
       "program": "${workspaceFolder}/index.test.ts",
       "request": "launch",
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "type": "node",
+      "outputCapture": "std"
+    },
+    {
+      "name": "Debug test cases",
+      "request": "launch",
+      "runtimeArgs": ["run-script", "test"],
+      "runtimeExecutable": "npm",
       "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "type": "node",
       "outputCapture": "std"
