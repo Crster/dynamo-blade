@@ -127,15 +127,23 @@ export type BladeTypeAdd<Type> = OptionalBladeItem<Type> &
 
 export type BladeTypeUpdate<Type> =
   | Partial<BladeTypeAdd<Type>>
-  | { $add: Partial<BladeTypeAdd<Type>> }
+  | {
+      $add: Partial<
+        Record<keyof BladeTypeAdd<Type>, number | Set<string> | Set<number>>
+      >;
+    }
   | { $set: Partial<BladeTypeAdd<Type>> }
-  | { $remove: Record<keyof Type, boolean> }
-  | { $delete: Partial<BladeTypeAdd<Type>> };
+  | { $remove: Partial<Record<keyof BladeTypeAdd<Type>, boolean>> }
+  | {
+      $delete: Partial<
+        Record<keyof BladeTypeAdd<Type>, Set<string> | Set<number>>
+      >;
+    };
 
 export interface BladeType<
   Type extends Record<
     string,
-    PrimaryKeyConstructor | BasicType | FieldType | BladeType<any>
+    PrimaryKeyConstructor | BasicType | FieldType | BladeType<any> | ((item: any) => string)
   >
 > {
   new ();
@@ -144,7 +152,7 @@ export interface BladeType<
 export class BladeType<
   Type extends Record<
     string,
-    PrimaryKeyConstructor | BasicType | FieldType | BladeType<any>
+    PrimaryKeyConstructor | BasicType | FieldType | BladeType<any> | ((item: any) => string)
   >
 > implements BladeType<any>
 {

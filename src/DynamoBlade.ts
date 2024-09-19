@@ -9,7 +9,13 @@ import { BladeView } from "./BladeView";
 import { BladeError } from "./BladeError";
 import { BladeCollection } from "./BladeCollection";
 import { addToAttributeDefinition } from "./BladeUtility";
-import { BladeOption, BladeSchema, BladeTypeField } from "./BladeType";
+import {
+  BladeOption,
+  BladeSchema,
+  BladeTypeField,
+  ValueFilter,
+} from "./BladeType";
+import { BladeKeySchema } from "./BladeKeySchema";
 
 export default class DynamoBlade<Schema extends BladeSchema> {
   public readonly option: BladeOption<Schema>;
@@ -145,14 +151,25 @@ export default class DynamoBlade<Schema extends BladeSchema> {
   }
 
   open<T extends string & keyof BladeTypeField<Schema["type"]>>(type: T) {
-    return new BladeCollection<Schema, Schema["type"][T]>(this.option, [type]);
+    return new BladeCollection<Schema["type"][T]>(
+      new BladeKeySchema(this.option).open(type)
+    );
   }
 
   query<T extends string & keyof Schema["index"]>(index: T) {
-    return new BladeView(this.option, [], "QUERY", index);
+    return {
+      where: (key: Record<string, [ValueFilter, any]>) => {
+        const blade = new BladeKeySchema(this.option);
+        for (const k in key) {
+          blade.whereIndexKey(index, k, key[k][0], key[k][1]);
+        }
+
+        return new BladeView(blade);
+      },
+    };
   }
 
   scan<T extends string & keyof Schema["index"]>(index: T) {
-    return new BladeView(this.option, [], "SCAN", index);
+    return new BladeView(new BladeKeySchema(this.option).setIndex(index));
   }
 }

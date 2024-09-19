@@ -5,100 +5,75 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import {
-  BladeOption,
-  BladeSchema,
   BladeType,
   BladeTypeField,
   BladeTypeUpdate,
   BladeItem,
   BladeTypeAdd,
 } from "./BladeType";
-import {
-  getDbKey,
-  getDbExtra,
-  getDbValue,
-  getUpdateData,
-  fromDbValue,
-} from "./BladeUtility";
 import { BladeCollection } from "./BladeCollection";
+import { BladeKeySchema } from "./BladeKeySchema";
+import { ValueFilter, DataFilter } from "./BladeType";
 
-export class BladeDocument<
-  Schema extends BladeSchema,
-  Type extends BladeType<any>
-> {
-  private readonly option: BladeOption<Schema>;
-  private readonly key: Array<string>;
+export class BladeDocument<Type extends BladeType<any>> {
+  private readonly blade: BladeKeySchema<any>;
 
-  constructor(option: BladeOption<Schema>, key: Array<string>) {
-    this.option = option;
-    this.key = key;
+  constructor(blade: BladeKeySchema<any>) {
+    this.blade = blade;
   }
 
   open<T extends string & keyof BladeTypeField<Type["type"]>>(type: T) {
-    return new BladeCollection<Schema, Type["type"][T]>(this.option, [
-      ...this.key,
-      type,
-    ]);
+    return new BladeCollection<Type["type"][T]>(this.blade.open(type));
   }
 
   async get(consistent?: boolean) {
     const command = new GetCommand({
-      TableName: this.option.schema.table.name,
+      TableName: this.blade.getTableName(),
       ConsistentRead: consistent,
-      Key: getDbKey(this.option.schema, this.key),
+      Key: this.blade.getKeyValue(),
     });
 
-    const result = await this.option.client.send(command);
+    const result = await this.blade.execute(command);
 
     if (result.$metadata.httpStatusCode === 200) {
-      return fromDbValue<BladeItem<Type["type"]>>(
-        this.option.schema,
-        this.key,
-        result.Item
-      );
+      return this.blade.buildItem<BladeItem<Type["type"]>>(result["Item"]);
     }
   }
 
-  async add(value: BladeTypeAdd<Type["type"]>) {
-    const data = {
-      ...getDbValue<BladeTypeAdd<Type["type"]>>(
-        this.option.schema,
-        this.key,
-        value
-      ),
-      ...getDbKey(this.option.schema, this.key),
-      ...getDbExtra(this.option.schema, this.key, "ADD"),
-    };
-
+  async add(value: BladeTypeAdd<Type["type"]>, overwrite?: boolean) {
     const command = new PutCommand({
-      TableName: this.option.schema.table.name,
-      Item: data,
+      TableName: this.blade.getTableName(),
+      Item: this.blade.getNewItem(value),
+      ConditionExpression: this.blade.buildAddCondition(overwrite),
     });
 
-    const result = await this.option.client.send(command);
+    const result = await this.blade.execute(command);
     return result.$metadata.httpStatusCode === 200;
   }
 
-  async set(value: BladeTypeUpdate<Type["type"]>) {
-    const data = getUpdateData(this.option.schema, this.key, value);
+  async set(
+    value: BladeTypeUpdate<Type["type"]>,
+    condition?: [string & keyof BladeItem<Type["type"]>, ValueFilter | DataFilter, any]
+  ) {
+    const update = this.blade.getUpdateItem(value, condition);
 
     const command = new UpdateCommand({
-      TableName: this.option.schema.table.name,
-      Key: getDbKey(this.option.schema, this.key),
-      ...data,
+      TableName: this.blade.getTableName(),
+      Key: this.blade.getKeyValue(),
+      ...update,
     });
 
-    const result = await this.option.client.send(command);
+    const result = await this.blade.execute(command);
     return result.$metadata.httpStatusCode === 200;
   }
 
   async remove() {
     const command = new DeleteCommand({
-      TableName: this.option.schema.table.name,
-      Key: getDbKey(this.option.schema, this.key),
+      TableName: this.blade.getTableName(),
+      Key: this.blade.getKeyValue(),
     });
 
-    const result = await this.option.client.send(command);
+    const result = await this.blade.execute(command);
     return result.$metadata.httpStatusCode === 200;
   }
 }

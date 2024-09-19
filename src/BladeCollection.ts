@@ -1,32 +1,26 @@
 import { BladeView } from "./BladeView";
 import { BladeDocument } from "./BladeDocument";
-import { BladeOption, BladeSchema, BladeType, ValueFilter, DataFilter, BladeTypePrimary } from './BladeType';
+import { BladeType } from "./BladeType";
+import { BladeKeySchema } from "./BladeKeySchema";
 
-export class BladeCollection<
-  Schema extends BladeSchema,
-  Type extends BladeType<any>
-> {
-  private readonly option: BladeOption<Schema>;
-  private readonly key: Array<string>;
+export class BladeCollection<Type extends BladeType<any>> {
+  private readonly blade: BladeKeySchema<any>;
 
-  constructor(option: BladeOption<Schema>, key: Array<string>) {
-    this.option = option;
-    this.key = key;
+  constructor(blade: BladeKeySchema<any>) {
+    this.blade = blade;
   }
 
-  is(key: string) {
-    return new BladeDocument<Schema, Type>(this.option, [...this.key, key]);
+  is(key: string | number | Date) {
+    return new BladeDocument<Type>(this.blade.whereKey("=", key));
   }
 
-  where(
-    field: string & keyof BladeTypePrimary<Type["type"]>,
-    condition: ValueFilter,
-    value: any
-  ) {
-    return new BladeView<Schema, Type>(this.option, this.key, "QUERY").where(
-      field,
-      condition,
-      value
+  beginsWith(key: string) {
+    return new BladeView<Type>(this.blade.whereKey("BEGINS_WITH", key));
+  }
+
+  between(fromKey: string, toKey: string) {
+    return new BladeView<Type>(
+      this.blade.whereKey("BETWEEN", [fromKey, toKey])
     );
   }
 }

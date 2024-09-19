@@ -1,6 +1,5 @@
 import DynamoBlade from "./DynamoBlade";
-export { BladeType } from "./BladeType";
-export { PrimaryKey } from "./BladeType";
 export { BladeError } from "./BladeError";
+export { BladeType, BladeResult, PrimaryKey } from "./BladeType";
 
 export default DynamoBlade;
