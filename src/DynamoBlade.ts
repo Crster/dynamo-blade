@@ -5,171 +5,170 @@ import {
   GlobalSecondaryIndex,
   KeySchemaElement,
 } from "@aws-sdk/client-dynamodb";
-import { BladeView } from "./BladeView";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { addToAttributeDefinition, getFieldKind } from "./BladeUtility";
 import { BladeError } from "./BladeError";
-import { BladeCollection } from "./BladeCollection";
-import { addToAttributeDefinition } from "./BladeUtility";
-import {
-  BladeOption,
-  BladeSchema,
-  BladeTypeField,
-  ValueFilter,
-} from "./BladeType";
-import { BladeKeySchema } from "./BladeKeySchema";
+import { BladeTable, BladeTableOption } from "./BladeTable";
 
-export default class DynamoBlade<Schema extends BladeSchema> {
-  public readonly option: BladeOption<Schema>;
+export class DynamoBlade {
+  public readonly client: DynamoDBDocumentClient;
+  private readonly tables: Record<string, BladeTable<BladeTableOption>>;
 
-  constructor(option: BladeOption<Schema>) {
-    this.option = option;
+  constructor(client: DynamoDBDocumentClient) {
+    this.client = client;
+    this.tables = {};
   }
 
-  async init(billingMode: BillingMode = "PAY_PER_REQUEST") {
-    const keySchema: Array<KeySchemaElement> = [];
-    const localIndex: Array<GlobalSecondaryIndex> = [];
-    const globalIndex: Array<GlobalSecondaryIndex> = [];
-    const attributes: Array<AttributeDefinition> = [];
+  table<Table extends string | BladeTable<BladeTableOption>>(table: Table) {
+    let tableName: string;
 
-    if (this.option.schema.table.hashKey) {
-      keySchema.push({
-        AttributeName: this.option.schema.table.hashKey,
-        KeyType: "HASH",
-      });
-      addToAttributeDefinition(
-        attributes,
-        this.option.schema.table.hashKey,
-        "S"
-      );
-    } else {
-      throw new BladeError("NO_HASHKEY", "No HASH field is set");
+    if (table instanceof BladeTable) {
+      table.client = this.client;
+      tableName = table.name;
+
+      this.tables[tableName] = table;
+    } else if (typeof table === "string") {
+      tableName = table;
     }
 
-    if (this.option.schema.table.sortKey) {
-      keySchema.push({
-        AttributeName: this.option.schema.table.sortKey,
-        KeyType: "RANGE",
-      });
-      addToAttributeDefinition(
-        attributes,
-        this.option.schema.table.sortKey,
-        "S"
-      );
-    }
+    return this.tables[tableName];
+  }
 
-    for (const indexName in this.option.schema.index) {
-      const index = this.option.schema.index[indexName];
+  private async _init(tableName: string) {
+    const table = this.tables[tableName];
+    if (table) {
+      const keySchema: Array<KeySchemaElement> = [];
+      const localIndex: Array<GlobalSecondaryIndex> = [];
+      const globalIndex: Array<GlobalSecondaryIndex> = [];
+      const attributes: Array<AttributeDefinition> = [];
 
-      if (index.type === "GLOBAL") {
-        const globalKeySchema: Array<KeySchemaElement> = [];
-        if (index.hashKey) {
-          globalKeySchema.push({
-            AttributeName: index.hashKey[0],
-            KeyType: "HASH",
-          });
-          addToAttributeDefinition(
-            attributes,
-            index.hashKey[0],
-            index.hashKey[1]
-          );
-        }
+      const hashKey = getFieldKind(table.option.keySchema, "HashKey").at(0);
+      const sortKey = getFieldKind(table.option.keySchema, "SortKey").at(0);
 
-        if (index.sortKey) {
-          globalKeySchema.push({
-            AttributeName: index.sortKey[0],
-            KeyType: "RANGE",
-          });
-          addToAttributeDefinition(
-            attributes,
-            index.sortKey[0],
-            index.sortKey[1]
-          );
-        }
-
-        globalIndex.push({
-          IndexName: indexName,
-          Projection: index.projection ?? { ProjectionType: "ALL" },
-          ProvisionedThroughput:
-            billingMode === "PROVISIONED"
-              ? { ReadCapacityUnits: 20, WriteCapacityUnits: 10 }
-              : undefined,
-          OnDemandThroughput: index.throughput,
-          KeySchema: globalKeySchema,
+      if (hashKey) {
+        keySchema.push({
+          AttributeName: hashKey.field,
+          KeyType: "HASH",
         });
-      } else if (index.type === "LOCAL") {
-        const localKeySchema: Array<KeySchemaElement> = [];
-        if (this.option.schema.table.hashKey) {
-          localKeySchema.push({
-            AttributeName: this.option.schema.table.hashKey,
-            KeyType: "HASH",
-          });
-        }
-
-        if (index.sortKey) {
-          localKeySchema.push({
-            AttributeName: index.sortKey[0],
-            KeyType: "RANGE",
-          });
-          addToAttributeDefinition(
-            attributes,
-            index.sortKey[0],
-            index.sortKey[1]
-          );
-        }
-
-        localIndex.push({
-          IndexName: indexName,
-          Projection: index.projection ?? { ProjectionType: "ALL" },
-          OnDemandThroughput: index.throughput,
-          KeySchema: localKeySchema,
-        });
+        addToAttributeDefinition(attributes, hashKey.field, hashKey.type);
+      } else {
+        throw new BladeError("NO_HASHKEY", "No HASH field is set");
       }
-    }
 
-    const command = new CreateTableCommand({
-      TableName: this.option.schema.table.name,
-      KeySchema: keySchema,
-      AttributeDefinitions: attributes,
-      ProvisionedThroughput:
-        billingMode === "PROVISIONED"
-          ? { ReadCapacityUnits: 20, WriteCapacityUnits: 10 }
-          : undefined,
-      LocalSecondaryIndexes: localIndex.length ? localIndex : undefined,
-      GlobalSecondaryIndexes: globalIndex.length ? globalIndex : undefined,
-      BillingMode: billingMode,
-    });
+      if (sortKey) {
+        keySchema.push({
+          AttributeName: sortKey.field,
+          KeyType: "RANGE",
+        });
+        addToAttributeDefinition(attributes, sortKey.field, sortKey.type);
+      }
 
-    try {
-      await this.option.client.send(command);
-      return true;
-    } catch (err) {
-      if (err.name === "ResourceInUseException") {
+      for (const indexName in table.option.index) {
+        const index = table.option.index[indexName];
+        const indexHashKey = getFieldKind(index.option.keySchema, "HashKey").at(0);
+        const indexSortKey = getFieldKind(index.option.keySchema, "SortKey").at(0);
+
+        if (index.type === "GLOBAL") {
+          const globalKeySchema: Array<KeySchemaElement> = [];
+          if (indexHashKey) {
+            globalKeySchema.push({
+              AttributeName: indexHashKey.field,
+              KeyType: "HASH",
+            });
+            addToAttributeDefinition(
+              attributes,
+              indexHashKey.field,
+              indexHashKey.type
+            );
+          }
+
+          if (indexSortKey) {
+            globalKeySchema.push({
+              AttributeName: indexSortKey.field,
+              KeyType: "RANGE",
+            });
+            addToAttributeDefinition(
+              attributes,
+              indexSortKey.field,
+              indexSortKey.type
+            );
+          }
+
+          globalIndex.push({
+            IndexName: indexName,
+            KeySchema: globalKeySchema,
+            Projection: index.option.projection,
+            OnDemandThroughput: index.option.onDemandThroughput,
+            ProvisionedThroughput: index.option.provisionedThroughput ?? table.option.provisionedThroughput,
+          });
+        } else if (index.type === "LOCAL") {
+          const localKeySchema: Array<KeySchemaElement> = [];
+          if (hashKey) {
+            localKeySchema.push({
+              AttributeName: hashKey.field,
+              KeyType: "HASH",
+            });
+          }
+
+          if (indexSortKey) {
+            localKeySchema.push({
+              AttributeName: indexSortKey.field,
+              KeyType: "RANGE",
+            });
+            addToAttributeDefinition(
+              attributes,
+              indexSortKey.field,
+              indexSortKey.type
+            );
+          }
+
+          localIndex.push({
+            IndexName: indexName,
+            KeySchema: localKeySchema,
+            Projection: index.option.projection,
+            OnDemandThroughput: index.option.onDemandThroughput,
+            ProvisionedThroughput: index.option.provisionedThroughput,
+          });
+        }
+      }
+
+      const command = new CreateTableCommand({
+        TableName: table.name,
+        KeySchema: keySchema,
+        AttributeDefinitions: attributes,
+        BillingMode: table.option.billingMode,
+        ProvisionedThroughput: table.option.provisionedThroughput,
+        LocalSecondaryIndexes: localIndex.length ? localIndex : undefined,
+        GlobalSecondaryIndexes: globalIndex.length ? globalIndex : undefined,
+      });
+
+      try {
+        await this.client.send(command);
         return true;
+      } catch (err) {
+        if (err.name === "ResourceInUseException") {
+          return true;
+        }
       }
     }
 
     return false;
   }
 
-  open<T extends string & keyof BladeTypeField<Schema["type"]>>(type: T) {
-    return new BladeCollection<Schema["type"][T]>(
-      new BladeKeySchema(this.option).open(type)
-    );
-  }
+  async init(): Promise<[boolean, Record<string, boolean>]> {
+    let success: boolean = true;
+    let results: Record<string, boolean> = {};
 
-  query<T extends string & keyof Schema["index"]>(index: T) {
-    return {
-      where: (key: Record<string, [ValueFilter, any]>) => {
-        const blade = new BladeKeySchema(this.option);
-        for (const k in key) {
-          blade.whereIndexKey(index, k, key[k][0], key[k][1]);
-        }
+    for (const table in this.tables) {
+      const result = await this._init(table);
 
-        return new BladeView(blade);
-      },
-    };
-  }
+      if (success) {
+        success = result;
+      }
 
-  scan<T extends string & keyof Schema["index"]>(index: T) {
-    return new BladeView(new BladeKeySchema(this.option).setIndex(index));
+      results[table] = result;
+    }
+
+    return [success, results];
   }
 }

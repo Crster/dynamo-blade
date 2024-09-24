@@ -1,13 +1,16 @@
-import { BladeType, PrimaryKey } from "../src";
+import {
+  BladeAttribute,
+  Default,
+  PrimaryKey,
+  RequiredField,
+  SetField,
+} from "../src";
 
-export const song = new BladeType({
-  songId: PrimaryKey,
-  artistAlbum: (ii) => `${ii.artistId}#${ii.albumId}`,
-  title: {
-    type: String,
-    required: true,
-  },
+export const song = new BladeAttribute({
+  songId: PrimaryKey(String),
+  artistAlbum: Default((ii) => `${ii.artistId}#${ii.albumId}`),
+  title: RequiredField(String),
   length: Number,
   downloadable: Boolean,
-  collab: { type: Array, itemType: String },
+  collab: SetField(String),
 });

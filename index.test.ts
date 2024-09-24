@@ -1,137 +1,136 @@
-import { db } from "./test/db";
+import { BladeResult } from "./src";
+import { blade, db } from "./test/db";
 
-main()
-  .then(() => console.log("Done!"))
-  .catch((err) => console.log("Error: " + err.message, err));
+test("test init", async () => {
+  blade.table(db);
 
-//---------------- Testing
-async function main() {
-  // await db
-  //   .open("artist")
-  //   .is("cat")
-  //   .add({
-  //     name: "Cool",
-  //     age: 5,
-  //     genres: new Set(["pop"]),
-  //   }, true);
+  const [result] = await blade.init();
+  expect(result).toBe(true);
+});
 
-  // await db
-  //   .open("artist")
-  //   .is("cat")
-  //   .set(
-  //     {
-  //       name: "Cool",
-  //       age: 5,
-  //       genres: new Set(["pop"]),
-  //     },
-  //     ["age", ">", 20]
-  //   );
+test("test add artist", async () => {
+  const result = await db
+    .open("artist")
+    .is("akon")
+    .add(
+      {
+        name: "Akon Tiam",
+        age: 50,
+        genres: new Set(["rnb", "pop"]),
+      },
+      true
+    );
 
-  // await db
-  //   .open("artist")
-  //   .is("cat")
-  //   .open("album")
-  //   .is("meow")
-  //   .add({
-  //     title: "House Cat",
-  //     releaseDate: new Date(2004, 5, 2),
-  //   });
+  expect(result).toBe(true);
+});
 
-  // await db
-  //   .open("artist")
-  //   .is("cat")
-  //   .open("album")
-  //   .is("roar")
-  //   .open("song")
-  //   .is("tiger")
-  //   .add({
-  //     title: "Tiger Cat",
-  //     collab: ["Cat", "Dog"],
-  //     downloadable: true,
-  //     length: 5,
-  //   });
+test("test get artist", async () => {
+  const result = await db.open("artist").is("akon").get();
 
-  // await db
-  //   .open("artist")
-  //   .is("cat")
-  //   .open("album")
-  //   .is("meow")
-  //   .set({
-  //     releaseDate: new Date(2004, 2, 22),
-  //   });
+  expect(result).toMatchObject({
+    artistId: "akon",
+    name: "Akon Tiam",
+    age: 50,
+    genres: new Set(["rnb", "pop"]),
+  });
+});
 
-  // await db
-  //   .open("artist")
-  //   .is("cat")
-  //   .open("album")
-  //   .is("meow")
-  //   .open("song")
-  //   .is("tiger")
-  //   .add({
-  //     title: "Tiger Cat",
-  //     collab: ["Cat", "Dog"],
-  //     downloadable: true,
-  //     length: 4,
-  //   });
+test("test update artist", async () => {
+  await db
+    .open("artist")
+    .is("akon")
+    .set({
+      name: "Badara Akon Thiam",
+      $set: {
+        age: 51,
+      },
+      $add: {
+        genres: new Set(["hip hop"]),
+      },
+    });
 
-  // await db
-  //   .open("artist")
-  //   .is("cat")
-  //   .open("album")
-  //   .is("meow")
-  //   .open("song")
-  //   .is("tiger")
-  //   .set({
-  //     $add: {
-  //       length: 6,
-  //     },
-  //     $remove: {
-  //       downloadable: true,
-  //     },
-  //     $set: {
-  //       collab: ["Cat", "Hen", "Dog"],
-  //     },
-  //     title: "Tiger Kitty",
-  //   });
+  const result = await db.open("artist").is("akon").get(true);
 
-  // await db
-  //   .open("artist")
-  //   .is("dog")
-  //   .open("album")
-  //   .is("roff")
-  //   .open("song")
-  //   .is("chuchu")
-  //   .set({
-  //     $add: {
-  //       length: 2,
-  //     },
-  //     $remove: {
-  //       downloadable: false,
-  //     },
-  //     $set: {
-  //       collab: ["Dog", "Cat"],
-  //     },
-  //     title: "Cats and Dog",
-  //   });
+  expect(result).toMatchObject({
+    name: "Badara Akon Thiam",
+    age: 51,
+    genres: new Set(["rnb", "pop", "hip hop"]),
+  });
+});
 
-  // await db
-  //   .open("artist")
-  //   .is("cat")
-  //   .open("album")
-  //   .is("roar")
-  //   .open("song")
-  //   .is("tiger")
-  //   .remove();
+test("test add album and song", async () => {
+  let success = false;
+  const album = db.open("artist").is("akon").open("album");
 
-  //const result = await db.open("artist").beginsWith("ca").get();
-  //console.log(result);
+  success = await album.is("trouble").add(
+    {
+      releaseDate: new Date(2007, 1),
+      title: "Trouble",
+    },
+    true
+  );
+  expect(success).toBe(true);
 
-  // const result2 = await db.open("artist").is("dog").open("album").is("roff").open("song").between("c", "d").get()
-  // console.log(result2);
+  success = await album
+    .is("konvicted")
+    .add({ releaseDate: new Date(2006, 2) }, true);
+  expect(success).toBe(true);
 
-  const result = await db.query("byType").where({
-    tk: ["=", "song"],
-    
-  }).get()
-  console.log(result)
-}
+  success = await album
+    .is("konvicted")
+    .open("song")
+    .is("smackthat")
+    .set({
+      title: "Smack That",
+      collab: new Set(["Eminem"]),
+      downloadable: false,
+      length: 3.33,
+    });
+  expect(success).toBe(true);
+
+  success = await album
+    .is("konvicted")
+    .open("song")
+    .is("icw")
+    .set({
+      title: "I Can't Wait",
+      collab: new Set(["T-Pain"]),
+      downloadable: true,
+      length: 3.46,
+    });
+
+  expect(success).toBe(true);
+});
+
+test("test query", async () => {
+  let result: BladeResult<any>;
+
+  result = await db
+    .open("artist")
+    .is("akon")
+    .open("album")
+    .beginsWith("tr")
+    .get();
+
+  expect(result.items.length).toBe(1);
+
+  result = await db
+    .open("artist")
+    .is("akon")
+    .where("genres", "CONTAINS", "hip hop")
+    .get();
+
+  expect(result.items[0]).toMatchObject({
+    artistId: "akon",
+  });
+});
+
+test("test query index byType", async () => {
+  const result = await db
+    .query("byType")
+    .where({
+      tk: ["=", "song"],
+    })
+    .get();
+  expect(result.items.length).toBe(2);
+});

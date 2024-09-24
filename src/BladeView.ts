@@ -1,31 +1,54 @@
 import { QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import {
+  BladeAttribute,
+  BladeAttributeSchema,
   BladeItem,
-  BladeResult,
-  BladeType,
-  DataFilter,
-  ValueFilter,
-} from "./BladeType";
+} from "./BladeAttribute";
 import { decodeNext, encodeNext, fillMap, getCondition } from "./BladeUtility";
-import { BladeKeySchema } from "./BladeKeySchema";
+import { Blade } from "./Blade";
 
-export class BladeView<Type extends BladeType<any>> {
-  private readonly blade: BladeKeySchema<any>;
+export type KeyFilter =
+  | "="
+  | "!="
+  | ">"
+  | ">="
+  | "<"
+  | "<="
+  | "BETWEEN"
+  | "BEGINS_WITH";
+
+export type DataFilter =
+  | "IN"
+  | "ATTRIBUTE_EXISTS"
+  | "ATTRIBUTE_NOT_EXISTS"
+  | "ATTRIBUTE_TYPE"
+  | "CONTAINS"
+  | "SIZE"
+  | "SIZE_GT"
+  | "SIZE_LT";
+
+export interface BladeResult<Type> {
+  items: Array<Type>;
+  next?: string;
+}
+
+export class BladeView<Attribute extends BladeAttribute<BladeAttributeSchema>> {
+  private readonly blade: Blade<any>;
   private readonly conditions: Array<{
     field: string;
-    condition: ValueFilter | DataFilter;
+    condition: KeyFilter | DataFilter;
     value: any;
     conjunction: "AND" | "OR";
   }>;
 
-  constructor(blade: BladeKeySchema<any>) {
+  constructor(blade: Blade<any>) {
     this.blade = blade;
     this.conditions = [];
   }
 
   and(
-    field: string & keyof BladeItem<Type["type"]>,
-    condition: ValueFilter | DataFilter,
+    field: string & keyof BladeItem<Attribute>,
+    condition: KeyFilter | DataFilter,
     value: any
   ) {
     this.conditions.push({ field, condition, value, conjunction: "AND" });
@@ -33,8 +56,8 @@ export class BladeView<Type extends BladeType<any>> {
   }
 
   or(
-    field: string & keyof BladeItem<Type["type"]>,
-    condition: ValueFilter | DataFilter,
+    field: string & keyof BladeItem<Attribute>,
+    condition: KeyFilter | DataFilter,
     value: any
   ) {
     this.conditions.push({ field, condition, value, conjunction: "OR" });
@@ -42,7 +65,7 @@ export class BladeView<Type extends BladeType<any>> {
   }
 
   async get(next?: string) {
-    const ret: BladeResult<BladeItem<Type["type"]>> = { items: [] };
+    const ret: BladeResult<BladeItem<Attribute>> = { items: [] };
 
     let counter: number = 0;
     let filterExpression: string;

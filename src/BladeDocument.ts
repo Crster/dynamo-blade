@@ -5,25 +5,34 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import {
-  BladeType,
-  BladeTypeField,
-  BladeTypeUpdate,
+  BladeAttribute,
   BladeItem,
-  BladeTypeAdd,
-} from "./BladeType";
+  BladeAttributeSchema,
+  BladeSchema,
+} from "./BladeAttribute";
 import { BladeCollection } from "./BladeCollection";
-import { BladeKeySchema } from "./BladeKeySchema";
-import { ValueFilter, DataFilter } from "./BladeType";
+import { Blade, BladeAttributeForAdd, BladeAttributeForUpdate } from "./Blade";
+import { BladeView, DataFilter, KeyFilter } from "./BladeView";
 
-export class BladeDocument<Type extends BladeType<any>> {
-  private readonly blade: BladeKeySchema<any>;
+export class BladeDocument<
+  Attribute extends BladeAttribute<BladeAttributeSchema>
+> {
+  private readonly blade: Blade<any>;
 
-  constructor(blade: BladeKeySchema<any>) {
+  constructor(blade: Blade<any>) {
     this.blade = blade;
   }
 
-  open<T extends string & keyof BladeTypeField<Type["type"]>>(type: T) {
-    return new BladeCollection<Type["type"][T]>(this.blade.open(type));
+  open<T extends string & keyof BladeSchema<Attribute>>(type: T) {
+    return new BladeCollection<BladeSchema<Attribute>[T]>(this.blade.open(type));
+  }
+
+  where(
+    field: string & keyof BladeItem<Attribute>,
+    condition: KeyFilter | DataFilter,
+    value: any
+  ) {
+    return new BladeView<Attribute>(this.blade).and(field, condition, value);
   }
 
   async get(consistent?: boolean) {
@@ -36,11 +45,11 @@ export class BladeDocument<Type extends BladeType<any>> {
     const result = await this.blade.execute(command);
 
     if (result.$metadata.httpStatusCode === 200) {
-      return this.blade.buildItem<BladeItem<Type["type"]>>(result["Item"]);
+      return this.blade.buildItem<BladeItem<Attribute>>(result["Item"]);
     }
   }
 
-  async add(value: BladeTypeAdd<Type["type"]>, overwrite?: boolean) {
+  async add(value: BladeAttributeForAdd<Attribute>, overwrite?: boolean) {
     const command = new PutCommand({
       TableName: this.blade.getTableName(),
       Item: this.blade.getNewItem(value),
@@ -52,8 +61,12 @@ export class BladeDocument<Type extends BladeType<any>> {
   }
 
   async set(
-    value: BladeTypeUpdate<Type["type"]>,
-    condition?: [string & keyof BladeItem<Type["type"]>, ValueFilter | DataFilter, any]
+    value: BladeAttributeForUpdate<Attribute>,
+    condition?: [
+      string & keyof BladeItem<Attribute>,
+      KeyFilter | DataFilter,
+      any
+    ]
   ) {
     const update = this.blade.getUpdateItem(value, condition);
 

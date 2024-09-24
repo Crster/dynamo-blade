@@ -1,60 +1,91 @@
 import { BladeError } from "./BladeError";
 import {
-  BladeOption,
-  BladeSchema,
-  BladeType,
-  ValueFilter,
-  BladeTypeUpdate,
-  PrimaryKeyConstructor,
-} from "./BladeType";
-import { getCondition } from "./BladeUtility";
-import { DataFilter } from "./BladeType";
+  BladeAttribute,
+  BladeAttributeSchema,
+  BladeItem,
+  PrimaryKeyField,
+} from "./BladeAttribute";
+import { getCondition, getFieldKind } from "./BladeUtility";
+import { BladeTable } from "./BladeTable";
+import { DataFilter, KeyFilter } from "./BladeView";
+import { EventHandler } from "./BladeAttribute";
 
 interface KeyAttribute {
   dataType: string;
   primaryKey: string;
   value?: any;
-  condition?: ValueFilter;
+  condition?: KeyFilter;
 }
 
-export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
-  public readonly option: Option;
+export type BladeAttributeForAdd<
+  Type extends BladeAttribute<BladeAttributeSchema>
+> = Omit<BladeItem<Type>, keyof PrimaryKeyField<Type>>;
+
+export type BladeAttributeForUpdate<
+  Type extends BladeAttribute<BladeAttributeSchema>
+> =
+  | Partial<BladeAttributeForAdd<Type>>
+  | {
+      $add: Partial<
+        Record<
+          keyof BladeAttributeForAdd<Type>,
+          number | Set<string> | Set<number>
+        >
+      >;
+    }
+  | { $set: Partial<BladeAttributeForAdd<Type>> }
+  | { $remove: Partial<Record<keyof BladeAttributeForAdd<Type>, boolean>> }
+  | {
+      $delete: Partial<
+        Record<keyof BladeAttributeForAdd<Type>, Set<string> | Set<number>>
+      >;
+    };
+
+export class Blade<Option extends BladeTable<any>> {
+  public readonly table: Option;
 
   private index: string;
   private scanIndexForward: boolean;
-  private currentSchema: BladeType<any>;
+  private currentSchema: BladeAttribute<BladeAttributeSchema>;
   private dataType: string;
-  private readonly keys: Array<KeyAttribute>;
+  private keys: Array<KeyAttribute>;
 
-  constructor(option: Option) {
-    this.option = option;
+  constructor(table: Option) {
+    this.table = table;
     this.scanIndexForward = true;
     this.keys = [];
   }
 
+  private _clone() {
+    const clone = new Blade(this.table);
+    clone.index = this.index;
+    clone.scanIndexForward = this.scanIndexForward;
+    clone.currentSchema = this.currentSchema;
+    clone.dataType = this.dataType;
+    clone.keys = this.keys;
+
+    return clone;
+  }
+
   open(type: string) {
-    if (this.currentSchema) {
-      this.currentSchema = this.currentSchema[type]?.type;
+    const clone = this._clone()
+
+    if (clone.currentSchema) {
+      clone.currentSchema = clone.currentSchema.schema[
+        type
+      ] as BladeAttribute<BladeAttributeSchema>;
     } else {
-      this.currentSchema = this.option.schema.type[type]?.type;
+      clone.currentSchema = clone.table.option.attribute[type];
     }
 
-    if (!this.currentSchema) {
+    if (!clone.currentSchema) {
       throw new BladeError("TYPE_UNKNOWN", "Type not found");
     }
 
-    let primaryKeyField: string;
-    for (const key in this.currentSchema) {
-      if (this.currentSchema[key] instanceof PrimaryKeyConstructor) {
-        primaryKeyField = key;
-        break;
-      } else if (
-        this.currentSchema[key]["type"] instanceof PrimaryKeyConstructor
-      ) {
-        primaryKeyField = key;
-        break;
-      }
-    }
+    const primaryKeyField = getFieldKind(
+      clone.currentSchema.schema,
+      "PrimaryKey"
+    ).at(0);
 
     if (!primaryKeyField) {
       throw new BladeError(
@@ -63,13 +94,13 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
       );
     }
 
-    this.dataType = type;
-    this.keys.push({
+    clone.dataType = type;
+    clone.keys.push({
       dataType: type,
-      primaryKey: primaryKeyField,
+      primaryKey: primaryKeyField.field,
     });
 
-    return this;
+    return clone;
   }
 
   setIndex(index: string) {
@@ -80,14 +111,21 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
   whereIndexKey(
     index: string,
     field: string,
-    condition: ValueFilter,
+    condition: KeyFilter,
     value: any
   ) {
-    const currentIndex = this.option.schema.index[index];
+    const currentIndex = this.table.option.index[index];
     if (!currentIndex) throw new BladeError("INDEX_UNKNOWN", "Index not found");
 
+    const hashKey = getFieldKind(currentIndex.option.keySchema, "HashKey").at(
+      0
+    );
+    const sortKey = getFieldKind(currentIndex.option.keySchema, "SortKey").at(
+      0
+    );
+
     this.index = index;
-    if (currentIndex.hashKey && currentIndex.hashKey[0] === field) {
+    if (hashKey?.field === field) {
       if (this.scanIndexForward) {
         this.scanIndexForward = ![">", "<", ">=", "<=", "BETWEEN"].includes(
           condition
@@ -96,7 +134,7 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
 
       this.keys.push({
         dataType: "HASHKEY",
-        primaryKey: currentIndex.hashKey[0],
+        primaryKey: hashKey.field,
         condition: condition,
         value,
       });
@@ -104,7 +142,7 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
       return this;
     }
 
-    if (currentIndex.sortKey && currentIndex.sortKey[0] === field) {
+    if (sortKey?.field === field) {
       if (this.scanIndexForward) {
         this.scanIndexForward = ![">", "<", ">=", "<=", "BETWEEN"].includes(
           condition
@@ -113,7 +151,7 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
 
       this.keys.push({
         dataType: "SORTKEY",
-        primaryKey: currentIndex.sortKey[0],
+        primaryKey: sortKey.field,
         condition: condition,
         value,
       });
@@ -124,7 +162,7 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
     return this;
   }
 
-  whereKey(condition: ValueFilter, value: any) {
+  whereKey(condition: KeyFilter, value: any) {
     const key = this.keys.at(-1);
     if (!key) throw new BladeError("KEY_MISSING", "No last key in the list");
 
@@ -158,7 +196,7 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
   }
 
   getTableName() {
-    return this.option.schema.table.name;
+    return this.table.name;
   }
 
   getKey() {
@@ -168,8 +206,8 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
   getKeyValue() {
     const ret = {};
 
-    let hashKey = this.option.schema.table.hashKey;
-    let sortKey = this.option.schema.table.sortKey;
+    const hashKey = getFieldKind(this.table.option.keySchema, "HashKey").at(0);
+    const sortKey = getFieldKind(this.table.option.keySchema, "SortKey").at(0);
 
     if (hashKey && sortKey) {
       const hashKeyRange = [0, this.keys.length - 1];
@@ -184,38 +222,47 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
       for (let xx = hashKeyRange[0]; xx < hashKeyRange[1]; xx++) {
         const key = this.keys[xx];
 
-        if (ret[hashKey]) {
-          ret[hashKey] += `${key.dataType}#${key.value}:`;
+        if (ret[hashKey.field]) {
+          ret[hashKey.field] += `${key.dataType}#${key.value}:`;
         } else {
-          ret[hashKey] = `${key.dataType}#${key.value}:`;
+          ret[hashKey.field] = `${key.dataType}#${key.value}:`;
         }
       }
 
-      ret[hashKey] = ret[hashKey].slice(0, ret[hashKey].length - 1);
+      ret[hashKey.field] = ret[hashKey.field].slice(
+        0,
+        ret[hashKey.field].length - 1
+      );
 
       for (let xx = sortKeyRange[0]; xx < sortKeyRange[1]; xx++) {
         const key = this.keys[xx];
 
-        if (ret[sortKey]) {
-          ret[sortKey] += `${key.dataType}#${key.value}:`;
+        if (ret[sortKey.field]) {
+          ret[sortKey.field] += `${key.dataType}#${key.value}:`;
         } else {
-          ret[sortKey] = `${key.dataType}#${key.value}:`;
+          ret[sortKey.field] = `${key.dataType}#${key.value}:`;
         }
       }
 
-      ret[sortKey] = ret[sortKey].slice(0, ret[sortKey].length - 1);
+      ret[sortKey.field] = ret[sortKey.field].slice(
+        0,
+        ret[sortKey.field].length - 1
+      );
     } else if (hashKey) {
       for (let xx = 0; xx < this.keys.length; xx++) {
         const key = this.keys[xx];
 
-        if (ret[hashKey]) {
-          ret[hashKey] += `${key.dataType}#${key.value}:`;
+        if (ret[hashKey.field]) {
+          ret[hashKey.field] += `${key.dataType}#${key.value}:`;
         } else {
-          ret[hashKey] = `${key.dataType}#${key.value}:`;
+          ret[hashKey.field] = `${key.dataType}#${key.value}:`;
         }
       }
 
-      ret[hashKey] = ret[hashKey].slice(0, ret[hashKey].length - 1);
+      ret[hashKey.field] = ret[hashKey.field].slice(
+        0,
+        ret[hashKey.field].length - 1
+      );
     }
 
     return ret;
@@ -245,13 +292,13 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
     const ret: Array<KeyAttribute> = [];
     const keyValue = { hashKey: [], sortKey: [] };
 
-    let hashKey = this.option.schema.table.hashKey;
-    let sortKey = this.option.schema.table.sortKey;
+    let hashKey = getFieldKind(this.table.option.keySchema, "HashKey").at(0);
+    let sortKey = getFieldKind(this.table.option.keySchema, "SortKey").at(0);
 
     if (this.index) {
-      const currentIndex = this.option.schema.index[this.index];
-      hashKey = currentIndex.hashKey[0];
-      sortKey = currentIndex.sortKey[0];
+      const currentIndex = this.table.option.index[this.index];
+      hashKey = getFieldKind(currentIndex.option.keySchema, "HashKey").at(0);
+      sortKey = getFieldKind(currentIndex.option.keySchema, "SortKey").at(0);
     }
 
     if (hashKey && sortKey) {
@@ -269,7 +316,7 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
         }
       }
 
-      let condition: ValueFilter;
+      let condition: KeyFilter;
       for (let xx = hashKeyRange[0]; xx < hashKeyRange[1]; xx++) {
         const key = this.keys[xx];
         condition = key.condition;
@@ -278,7 +325,7 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
 
       ret.push({
         dataType: "HASHKEY",
-        primaryKey: hashKey,
+        primaryKey: hashKey.field,
         condition: condition,
         value:
           keyValue.hashKey.length === 1
@@ -296,7 +343,7 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
         if (keyValue.sortKey.length) {
           ret.push({
             dataType: "SORTKEY",
-            primaryKey: sortKey,
+            primaryKey: sortKey.field,
             condition: condition,
             value:
               keyValue.sortKey.length === 1
@@ -306,7 +353,7 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
         }
       }
     } else if (hashKey) {
-      let condition: ValueFilter;
+      let condition: KeyFilter;
       for (let xx = 0; xx < this.keys.length; xx++) {
         const key = this.keys[xx];
         condition = key.condition;
@@ -315,7 +362,7 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
 
       ret.push({
         dataType: "HASHKEY",
-        primaryKey: hashKey,
+        primaryKey: hashKey.field,
         condition: condition,
         value:
           keyValue.hashKey.length === 1
@@ -328,13 +375,13 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
   }
 
   getItemValue(value: Record<string, any>, field: string) {
-    const schema = this.currentSchema[field];
+    const schema = this.currentSchema.schema[field];
     let fieldValue: any;
 
-    if (typeof schema === "function" && schema.name === field) {
-      fieldValue = schema(value);
-    } else {
-      fieldValue = value[field] ?? schema["default"];
+    fieldValue = value[field];
+
+    if (schema["kind"] === "OnCreate" && fieldValue === undefined) {
+      fieldValue = schema["type"](value);
     }
 
     if (fieldValue instanceof Date) {
@@ -347,6 +394,10 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
   getNewItem(value: Record<string, any>) {
     const ret = {};
 
+    const typeKey = getFieldKind(this.table.option.keySchema, "TypeKey").at(0);
+    const onCreate = getFieldKind(this.table.option.keySchema, "OnCreate");
+    const onModify = getFieldKind(this.table.option.keySchema, "OnModify");
+
     const dbKey = this.getKeyValue();
     for (const field in dbKey) {
       ret[field] = dbKey[field];
@@ -356,20 +407,31 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
       ret[key.primaryKey] = key.value;
     }
 
-    if (this.option.schema.table.typeKey) {
-      ret[this.option.schema.table.typeKey] = this.dataType;
-    }
-
-    if (this.option.schema.table.createdOn) {
-      ret[this.option.schema.table.createdOn] = new Date().toISOString();
-    }
-
-    if (this.option.schema.table.modifiedOn) {
-      ret[this.option.schema.table.modifiedOn] = new Date().toISOString();
+    if (typeKey) {
+      ret[typeKey.field] = this.dataType;
     }
 
     const tmpValue = { ...ret, ...value };
-    for (const field in this.currentSchema) {
+
+    if (onCreate) {
+      for (const autoField of onCreate) {
+        const handler = autoField.bladeField.type as EventHandler;
+        if (typeof handler === "function") {
+          ret[autoField.field] = handler(tmpValue);
+        }
+      }
+    }
+
+    if (onModify) {
+      for (const autoField of onModify) {
+        const handler = autoField.bladeField.type as EventHandler;
+        if (typeof handler === "function") {
+          ret[autoField.field] = handler(tmpValue);
+        }
+      }
+    }
+
+    for (const field in this.currentSchema.schema) {
       const fieldValue = this.getItemValue(tmpValue, field);
 
       if (fieldValue !== undefined) {
@@ -381,9 +443,12 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
   }
 
   getUpdateItem(
-    value: BladeTypeUpdate<BladeType<any>>,
-    condition?: [string, ValueFilter | DataFilter, any]
+    value: BladeAttributeForUpdate<BladeAttribute<any>>,
+    condition?: [string, KeyFilter | DataFilter, any]
   ) {
+    const typeKey = getFieldKind(this.table.option.keySchema, "TypeKey").at(0);
+    const onModify = getFieldKind(this.table.option.keySchema, "OnModify");
+
     const updates = new Map<string, { type: string; value: any }>();
 
     for (const key in value) {
@@ -412,16 +477,9 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
       });
     }
 
-    if (this.option.schema.table.typeKey) {
-      updates.set(this.option.schema.table.typeKey, {
+    if (typeKey) {
+      updates.set(typeKey.field, {
         value: this.dataType,
-        type: "$set",
-      });
-    }
-
-    if (this.option.schema.table.modifiedOn) {
-      updates.set(this.option.schema.table.modifiedOn, {
-        value: new Date().toISOString(),
         type: "$set",
       });
     }
@@ -431,8 +489,20 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
       tmpValue[k] = v.value;
     }
 
-    for (const field in this.currentSchema) {
-      const schema = this.currentSchema[field];
+    if (onModify) {
+      for (const autoField of onModify) {
+        const handler = autoField.bladeField.type as EventHandler;
+        if (typeof handler === "function") {
+          updates.set(autoField.field, {
+            value: handler(tmpValue),
+            type: "$set",
+          });
+        }
+      }
+    }
+
+    for (const field in this.currentSchema.schema) {
+      const schema = this.currentSchema.schema[field];
       if (typeof schema === "function" && schema.name === field) {
         const fieldValue = this.getItemValue(tmpValue, field);
         if (fieldValue !== undefined) {
@@ -519,15 +589,15 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
   }
 
   execute(command: any) {
-    return this.option.client.send(command);
+    return this.table.client.send(command);
   }
 
   buildItem<Type>(value: Record<string, any>) {
     if (value) {
       const ret = {};
 
-      for (const field in this.currentSchema) {
-        const schema = this.currentSchema[field];
+      for (const field in this.currentSchema.schema) {
+        const schema = this.currentSchema.schema[field];
         const fieldValue = value[field] ?? schema["default"];
 
         if (fieldValue !== undefined) {
@@ -547,13 +617,17 @@ export class BladeKeySchema<Option extends BladeOption<BladeSchema>> {
 
   buildAddCondition(overwrite?: boolean) {
     if (!overwrite) {
-      if (
-        this.option.schema.table.hashKey &&
-        this.option.schema.table.sortKey
-      ) {
-        return `attribute_not_exists(${this.option.schema.table.hashKey}) AND attribute_not_exists(${this.option.schema.table.sortKey})`;
-      } else if (this.option.schema.table.hashKey) {
-        return `attribute_not_exists(${this.option.schema.table.hashKey})`;
+      const hashKey = getFieldKind(this.table.option.keySchema, "HashKey").at(
+        0
+      );
+      const sortKey = getFieldKind(this.table.option.keySchema, "SortKey").at(
+        0
+      );
+
+      if (hashKey && sortKey) {
+        return `attribute_not_exists(${hashKey.field}) AND attribute_not_exists(${sortKey.field})`;
+      } else if (hashKey.field) {
+        return `attribute_not_exists(${hashKey.field})`;
       }
     }
   }

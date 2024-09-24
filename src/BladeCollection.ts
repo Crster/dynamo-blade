@@ -1,12 +1,12 @@
 import { BladeView } from "./BladeView";
 import { BladeDocument } from "./BladeDocument";
-import { BladeType } from "./BladeType";
-import { BladeKeySchema } from "./BladeKeySchema";
+import { BladeAttribute, BladeAttributeSchema } from "./BladeAttribute";
+import { Blade } from "./Blade";
 
-export class BladeCollection<Type extends BladeType<any>> {
-  private readonly blade: BladeKeySchema<any>;
+export class BladeCollection<Type extends BladeAttribute<BladeAttributeSchema>> {
+  private readonly blade: Blade<any>;
 
-  constructor(blade: BladeKeySchema<any>) {
+  constructor(blade: Blade<any>) {
     this.blade = blade;
   }
 

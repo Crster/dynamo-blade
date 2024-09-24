@@ -2,11 +2,13 @@ import {
   AttributeDefinition,
   ScalarAttributeType,
 } from "@aws-sdk/client-dynamodb";
-import { DataFilter, ValueFilter } from "./BladeType";
+import { BladeField, BladeFieldKind } from "./BladeField";
+import { DataFilter, KeyFilter } from "./BladeView";
+import { BladeAttributeSchemaValueType } from "./BladeAttribute";
 
 export function getCondition(
   field: string,
-  condition: ValueFilter | DataFilter,
+  condition: KeyFilter | DataFilter,
   value: any,
   counter: number
 ) {
@@ -141,4 +143,37 @@ export function addToAttributeDefinition(
       AttributeType: type,
     });
   }
+}
+
+export function getFieldKind(
+  keyFields: Record<string, BladeAttributeSchemaValueType>,
+  kind: BladeFieldKind
+) {
+  let ret: Array<{
+    field: string;
+    type: ScalarAttributeType;
+    bladeField: BladeField;
+  }> = [];
+
+  for (const field in keyFields) {
+    const fieldKind = keyFields[field]["kind"];
+
+    if (fieldKind === kind) {
+      const bladeField = keyFields[field] as BladeField;
+      let type: ScalarAttributeType = "S";
+
+      switch (bladeField.type) {
+        case Number:
+          type = "N";
+          break;
+        case Buffer:
+          type = "B";
+          break;
+      }
+
+      ret.push({ bladeField, field, type });
+    }
+  }
+
+  return ret;
 }
