@@ -134,7 +134,41 @@ const result = await db
 const result = await db
     .query("byType")
     .where({
-      tk: BladeFilter("=", "song"), // Use BladeFilter to define the condition of the query
+      tk: BladeFilter("=", "artist:album:song"), // Use BladeFilter to define the condition of the query
     })
     .get();
+```
+
+### Result object sample
+```js
+console.log(result)
+// Will display
+{
+  "count": 3,
+  "data": {
+    "artist:album:song": [
+      {
+        "songId": "icw",
+        "artistAlbum": "john#kontra",
+        "title": "I Could Wait",
+        "length": 3.46,
+        "downloadable": true,
+      },
+      {
+        "songId": "mama",
+        "artistAlbum": "john#love",
+        "title": "Mama Loves You",
+        "length": 4.26,
+        "downloadable": true,
+      },
+      {
+        "songId": "smt",
+        "artistAlbum": "john#kontra",
+        "title": "Start More That",
+        "length": 3.33,
+        "downloadable": false,
+      }
+    ]
+  }
+}
 ```

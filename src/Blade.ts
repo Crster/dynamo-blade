@@ -9,6 +9,7 @@ import { getCondition, getFieldKind } from "./BladeUtility";
 import { BladeTable } from "./BladeTable";
 import { DataFilter, KeyFilter } from "./BladeView";
 import { EventHandler } from "./BladeAttribute";
+import { BladeFieldKind } from "./BladeField";
 
 interface KeyAttribute {
   dataType: string;
@@ -94,7 +95,12 @@ export class Blade<Option extends BladeTable<any>> {
       );
     }
 
-    clone.dataType = type;
+    if (clone.dataType) {
+      clone.dataType = clone.dataType + ":" + type;
+    } else {
+      clone.dataType = type;
+    }
+
     clone.keys.push({
       dataType: type,
       primaryKey: primaryKeyField.field,
@@ -212,7 +218,15 @@ export class Blade<Option extends BladeTable<any>> {
   }
 
   getTableName() {
-    return this.table.name;
+    if (this.table.namePrefix) {
+      return this.table.namePrefix + "_" + this.table.name;
+    } else {
+      return this.table.name;
+    }
+  }
+
+  getKeyField(kind: BladeFieldKind) {
+    return getFieldKind(this.table.option.keySchema, kind);
   }
 
   getKey() {
@@ -608,13 +622,27 @@ export class Blade<Option extends BladeTable<any>> {
     return this.table.client.send(command);
   }
 
-  buildItem<Type>(value: Record<string, any>) {
+  buildItem<Type>(
+    value: Record<string, any>,
+    currentSchema?: BladeAttribute<BladeAttributeSchema>
+  ) {
     if (value) {
       const ret = {};
+      const tmpSchema = currentSchema?.schema ?? this.currentSchema.schema;
 
-      for (const field in this.currentSchema.schema) {
-        const schema = this.currentSchema.schema[field];
-        const fieldValue = value[field] ?? schema["default"];
+      for (const field in tmpSchema) {
+        const schema = tmpSchema[field];
+
+        let fieldValue = value[field];
+
+        if (
+          fieldValue === undefined &&
+          schema["type"] &&
+          typeof schema["type"] === "function" &&
+          schema["type"].name === ""
+        ) {
+          fieldValue = schema["type"](value);
+        }
 
         if (fieldValue !== undefined) {
           if (schema instanceof Date) {

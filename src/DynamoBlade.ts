@@ -12,9 +12,11 @@ import { addToAttributeDefinition, getFieldKind } from "./BladeUtility";
 export class DynamoBlade {
   public readonly client: DynamoDBDocumentClient;
   private readonly tables: Record<string, BladeTable<BladeTableOption>>;
+  private readonly tablePrefix: string;
 
-  constructor(client: DynamoDBDocumentClient) {
+  constructor(client: DynamoDBDocumentClient, name?: string) {
     this.client = client;
+    this.tablePrefix = name || "";
     this.tables = {};
   }
 
@@ -26,6 +28,8 @@ export class DynamoBlade {
 
       if (!this.tables[tableName]) {
         table.client = this.client;
+        table.namePrefix = this.tablePrefix;
+
         this.tables[tableName] = table;
       }
     }

@@ -1,5 +1,5 @@
 import { Blade } from "./Blade";
-import { BladeField } from "./BladeField";
+import { BladeField, TypeKey } from "./BladeField";
 import { BladeDocument } from "./BladeDocument";
 import { BladeView, KeyFilter } from "./BladeView";
 import { BladeCollection } from "./BladeCollection";
@@ -11,6 +11,8 @@ import {
   BladeAttributeSchema,
   TypeFromBladeField,
 } from "./BladeAttribute";
+import { getFieldKind } from "./BladeUtility";
+import { BladeError } from './BladeError';
 
 export interface BladeTableOption {
   keySchema: Record<string, BladeField>;
@@ -33,6 +35,7 @@ export class BladeTable<Option extends BladeTableOption> {
   public readonly name: string;
   public readonly option: Option;
 
+  public namePrefix: string;
   public client: DynamoDBDocumentClient;
 
   constructor(name: string, option: Option) {
@@ -51,6 +54,14 @@ export class BladeTable<Option extends BladeTableOption> {
         ReadCapacityUnits: 20,
         WriteCapacityUnits: 15,
       };
+    }
+
+    const hashKey = getFieldKind(this.option.keySchema, "HashKey").at(0);
+    if (!hashKey) throw new BladeError("NO_HASHKEY", "No HASH field is set");
+
+    const typeField = getFieldKind(this.option.keySchema, "TypeKey").at(0);
+    if (!typeField) {
+      this.option.keySchema["_tk"] = TypeKey();
     }
   }
 

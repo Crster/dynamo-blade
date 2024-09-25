@@ -143,7 +143,7 @@ test("test query", async () => {
     .beginsWith("tr")
     .get();
 
-  expect(result.items.length).toBe(1);
+  expect(result.count).toBe(1);
 
   result = await db
     .open("artist")
@@ -151,7 +151,7 @@ test("test query", async () => {
     .where("genres", "CONTAINS", "hip hop")
     .get();
 
-  expect(result.items[0]).toMatchObject({
+  expect(result.data["artist"].at(0)).toMatchObject({
     artistId: "akon",
   });
 });
@@ -168,16 +168,16 @@ test("test query local index byReleaseDate", async () => {
     })
     .get();
 
-  expect(result.items.length).toBe(1);
+  expect(result.count).toBe(1);
 });
 
 test("test query global index byType", async () => {
   const result = await db
     .query("byType")
     .where({
-      tk: BladeFilter("=", "song"),
+      tk: BladeFilter("=", "artist:album:song"),
     })
     .get();
 
-  expect(result.items.length).toBe(3);
+  expect(result.count).toBe(3);
 });

@@ -4,7 +4,16 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import { DataFilter, KeyFilter } from "./BladeView";
 import { BladeField, BladeFieldKind } from "./BladeField";
-import { BladeAttributeSchemaValueType } from "./BladeAttribute";
+import { BladeTable, BladeTableOption } from "./BladeTable";
+import {
+  BladeAttribute,
+  BladeAttributeSchema,
+  BladeAttributeSchemaValueType,
+} from "./BladeAttribute";
+
+export function BladeFilter(condition: KeyFilter, value: any) {
+  return { condition, value };
+}
 
 export function getCondition(
   field: string,
@@ -178,6 +187,22 @@ export function getFieldKind(
   return ret;
 }
 
-export function BladeFilter(condition: KeyFilter, value: any) {
-  return { condition, value };
+export function getSchemaFromTypeKey(
+  table: BladeTable<BladeTableOption>,
+  typeKey: string
+) {
+  const types = typeKey.split(":");
+
+  let currentSchema: BladeAttribute<BladeAttributeSchema>;
+  for (const type of types) {
+    if (currentSchema) {
+      currentSchema = currentSchema.schema[
+        type
+      ] as BladeAttribute<BladeAttributeSchema>;
+    } else {
+      currentSchema = table.option.attribute[type];
+    }
+  }
+
+  return currentSchema;
 }

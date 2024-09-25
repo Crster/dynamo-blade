@@ -5,7 +5,13 @@ import {
 } from "./BladeAttribute";
 import { Blade } from "./Blade";
 import { QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { decodeNext, encodeNext, fillMap, getCondition } from "./BladeUtility";
+import {
+  decodeNext,
+  encodeNext,
+  fillMap,
+  getCondition,
+  getSchemaFromTypeKey,
+} from "./BladeUtility";
 
 export type KeyFilter =
   | "="
@@ -28,7 +34,8 @@ export type DataFilter =
   | "SIZE_LT";
 
 export interface BladeResult<Type> {
-  items: Array<Type>;
+  count: number;
+  data: Record<string, Array<Type>>;
   next?: string;
 }
 
@@ -65,7 +72,7 @@ export class BladeView<Attribute extends BladeAttribute<BladeAttributeSchema>> {
   }
 
   async get(next?: string) {
-    const ret: BladeResult<BladeItem<Attribute>> = { items: [] };
+    const ret: BladeResult<BladeItem<Attribute>> = { count: 0, data: {} };
 
     let counter: number = 0;
     let filterExpression: string;
@@ -152,8 +159,24 @@ export class BladeView<Attribute extends BladeAttribute<BladeAttributeSchema>> {
 
     const result = await this.blade.execute(command);
 
-    for (const ii of result["Items"]) {
-      ret.items.push(ii);
+    if (result["Items"]) {
+      const typeKey = this.blade.getKeyField("TypeKey").at(0);
+      ret.count = result["Count"];
+
+      const groups = new Map<string, BladeAttribute<BladeAttributeSchema>>();
+      for (const ii of result["Items"]) {
+        const group = ii[typeKey.field];
+
+        if (!groups.has(group)) {
+          groups.set(group, getSchemaFromTypeKey(this.blade.table, group));
+        }
+
+        if (!ret.data[group]) {
+          ret.data[group] = [];
+        }
+
+        ret.data[group].push(this.blade.buildItem(ii, groups.get(group)));
+      }
     }
 
     if (result["LastEvaluatedKey"]) {
