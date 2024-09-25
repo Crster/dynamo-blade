@@ -1,4 +1,5 @@
 import { DynamoBlade } from "./DynamoBlade";
+export { BladeFilter } from "./BladeUtility";
 export { BladeIndex } from "./BladeIndex";
 export { BladeTable } from "./BladeTable";
 export { BladeResult } from "./BladeView";

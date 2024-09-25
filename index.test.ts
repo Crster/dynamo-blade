@@ -1,9 +1,7 @@
-import { BladeResult } from "./src";
+import { BladeFilter, BladeResult } from "./src";
 import { blade, db } from "./test/db";
 
 test("test init", async () => {
-  blade.table(db);
-
   const [result] = await blade.init();
   expect(result).toBe(true);
 });
@@ -55,6 +53,39 @@ test("test update artist", async () => {
     name: "Badara Akon Thiam",
     age: 51,
     genres: new Set(["rnb", "pop", "hip hop"]),
+  });
+});
+
+test("test add song", async () => {
+  await db
+    .open("artist")
+    .is("akon")
+    .open("album")
+    .is("trouble")
+    .open("song")
+    .is("mamaafrika")
+    .add(
+      {
+        title: "Mama Africa",
+        collab: new Set(["akon"]),
+        downloadable: true,
+        length: 4.26,
+      },
+      true
+    );
+
+  const newSong = await db
+    .open("artist")
+    .is("akon")
+    .open("album")
+    .is("trouble")
+    .open("song")
+    .is("mamaafrika")
+    .get();
+
+  expect(newSong).toMatchObject({
+    songId: "mamaafrika",
+    artistAlbum: "akon#trouble",
   });
 });
 
@@ -125,12 +156,28 @@ test("test query", async () => {
   });
 });
 
-test("test query index byType", async () => {
+test("test query local index byReleaseDate", async () => {
+  const result = await db
+    .query("byRelease")
+    .where({
+      pk: db.open("artist").is("akon"),
+      releaseDate: BladeFilter("BETWEEN", [
+        new Date(2007, 1),
+        new Date(2007, 2),
+      ]),
+    })
+    .get();
+
+  expect(result.items.length).toBe(1);
+});
+
+test("test query global index byType", async () => {
   const result = await db
     .query("byType")
     .where({
-      tk: ["=", "song"],
+      tk: BladeFilter("=", "song"),
     })
     .get();
-  expect(result.items.length).toBe(2);
+
+  expect(result.items.length).toBe(3);
 });

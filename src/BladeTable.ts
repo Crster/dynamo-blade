@@ -1,11 +1,16 @@
-import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { Blade } from "./Blade";
+import { BladeField } from "./BladeField";
+import { BladeDocument } from "./BladeDocument";
 import { BladeView, KeyFilter } from "./BladeView";
 import { BladeCollection } from "./BladeCollection";
-import { BladeAttribute, BladeAttributeSchema } from "./BladeAttribute";
-import { BladeField } from "./BladeField";
 import { BladeIndex, BladeIndexOption } from "./BladeIndex";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { BillingMode, ProvisionedThroughput } from "@aws-sdk/client-dynamodb";
+import {
+  BladeAttribute,
+  BladeAttributeSchema,
+  TypeFromBladeField,
+} from "./BladeAttribute";
 
 export interface BladeTableOption {
   keySchema: Record<string, BladeField>;
@@ -14,6 +19,15 @@ export interface BladeTableOption {
   billingMode?: BillingMode;
   provisionedThroughput?: ProvisionedThroughput;
 }
+
+export type IndexKeyFilter<Index extends BladeIndex<BladeIndexOption>> = {
+  [Key in keyof Index["option"]["keySchema"]]?:
+    | {
+        condition: KeyFilter;
+        value: TypeFromBladeField<Index["option"]["keySchema"][Key]>;
+      }
+    | BladeDocument<BladeAttribute<BladeAttributeSchema>>;
+};
 
 export class BladeTable<Option extends BladeTableOption> {
   public readonly name: string;
@@ -48,10 +62,14 @@ export class BladeTable<Option extends BladeTableOption> {
 
   query<T extends string & keyof Option["index"]>(index: T) {
     return {
-      where: (key: Record<string, [KeyFilter, any]>) => {
+      where: (key: IndexKeyFilter<Option["index"][T]>) => {
         const blade = new Blade<BladeTable<Option>>(this);
         for (const k in key) {
-          blade.whereIndexKey(index, k, key[k][0], key[k][1]);
+          if (key[k] instanceof BladeDocument) {
+            blade.whereIndexKey(index, k, "=", key[k].getKey("HashKey"));
+          } else {
+            blade.whereIndexKey(index, k, key[k].condition, key[k].value);
+          }
         }
 
         return new BladeView(blade);

@@ -2,8 +2,8 @@ import {
   AttributeDefinition,
   ScalarAttributeType,
 } from "@aws-sdk/client-dynamodb";
-import { BladeField, BladeFieldKind } from "./BladeField";
 import { DataFilter, KeyFilter } from "./BladeView";
+import { BladeField, BladeFieldKind } from "./BladeField";
 import { BladeAttributeSchemaValueType } from "./BladeAttribute";
 
 export function getCondition(
@@ -176,4 +176,8 @@ export function getFieldKind(
   }
 
   return ret;
+}
+
+export function BladeFilter(condition: KeyFilter, value: any) {
+  return { condition, value };
 }

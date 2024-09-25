@@ -1,14 +1,13 @@
 import {
   AttributeDefinition,
-  BillingMode,
   CreateTableCommand,
   GlobalSecondaryIndex,
   KeySchemaElement,
 } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { addToAttributeDefinition, getFieldKind } from "./BladeUtility";
 import { BladeError } from "./BladeError";
 import { BladeTable, BladeTableOption } from "./BladeTable";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { addToAttributeDefinition, getFieldKind } from "./BladeUtility";
 
 export class DynamoBlade {
   public readonly client: DynamoDBDocumentClient;
@@ -19,19 +18,19 @@ export class DynamoBlade {
     this.tables = {};
   }
 
-  table<Table extends string | BladeTable<BladeTableOption>>(table: Table) {
+  table<Table extends BladeTable<BladeTableOption>>(table: Table) {
     let tableName: string;
 
     if (table instanceof BladeTable) {
-      table.client = this.client;
       tableName = table.name;
 
-      this.tables[tableName] = table;
-    } else if (typeof table === "string") {
-      tableName = table;
+      if (!this.tables[tableName]) {
+        table.client = this.client;
+        this.tables[tableName] = table;
+      }
     }
 
-    return this.tables[tableName];
+    return this.tables[tableName] as Table;
   }
 
   private async _init(tableName: string) {
@@ -65,8 +64,12 @@ export class DynamoBlade {
 
       for (const indexName in table.option.index) {
         const index = table.option.index[indexName];
-        const indexHashKey = getFieldKind(index.option.keySchema, "HashKey").at(0);
-        const indexSortKey = getFieldKind(index.option.keySchema, "SortKey").at(0);
+        const indexHashKey = getFieldKind(index.option.keySchema, "HashKey").at(
+          0
+        );
+        const indexSortKey = getFieldKind(index.option.keySchema, "SortKey").at(
+          0
+        );
 
         if (index.type === "GLOBAL") {
           const globalKeySchema: Array<KeySchemaElement> = [];
@@ -99,7 +102,9 @@ export class DynamoBlade {
             KeySchema: globalKeySchema,
             Projection: index.option.projection,
             OnDemandThroughput: index.option.onDemandThroughput,
-            ProvisionedThroughput: index.option.provisionedThroughput ?? table.option.provisionedThroughput,
+            ProvisionedThroughput:
+              index.option.provisionedThroughput ??
+              table.option.provisionedThroughput,
           });
         } else if (index.type === "LOCAL") {
           const localKeySchema: Array<KeySchemaElement> = [];

@@ -68,7 +68,7 @@ export class Blade<Option extends BladeTable<any>> {
   }
 
   open(type: string) {
-    const clone = this._clone()
+    const clone = this._clone();
 
     if (clone.currentSchema) {
       clone.currentSchema = clone.currentSchema.schema[
@@ -124,6 +124,22 @@ export class Blade<Option extends BladeTable<any>> {
       0
     );
 
+    let tmpValue: any;
+    if (Array.isArray(value)) {
+      tmpValue = [];
+      for (const val of value) {
+        if (val instanceof Date) {
+          tmpValue.push(val.toISOString());
+        } else {
+          tmpValue.push(val);
+        }
+      }
+    } else if (value instanceof Date) {
+      tmpValue = value.toISOString();
+    } else {
+      tmpValue = value;
+    }
+
     this.index = index;
     if (hashKey?.field === field) {
       if (this.scanIndexForward) {
@@ -136,7 +152,7 @@ export class Blade<Option extends BladeTable<any>> {
         dataType: "HASHKEY",
         primaryKey: hashKey.field,
         condition: condition,
-        value,
+        value: tmpValue,
       });
 
       return this;
@@ -153,7 +169,7 @@ export class Blade<Option extends BladeTable<any>> {
         dataType: "SORTKEY",
         primaryKey: sortKey.field,
         condition: condition,
-        value,
+        value: tmpValue,
       });
 
       return this;

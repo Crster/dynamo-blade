@@ -1,4 +1,4 @@
-import { BladeField, BladeFieldKind, OptionalField } from "./BladeField";
+import { BladeField, OptionalField } from "./BladeField";
 
 export type ScalarType =
   | StringConstructor

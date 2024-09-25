@@ -1,4 +1,4 @@
-import { BladeAttribute, Default, PrimaryKey, SetField } from "../src";
+import { BladeAttribute, PrimaryKey, SetField } from "../src";
 import { album } from "./albumType";
 
 export const artist = new BladeAttribute({

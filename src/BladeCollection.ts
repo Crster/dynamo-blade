@@ -1,7 +1,7 @@
+import { Blade } from "./Blade";
 import { BladeView } from "./BladeView";
 import { BladeDocument } from "./BladeDocument";
 import { BladeAttribute, BladeAttributeSchema } from "./BladeAttribute";
-import { Blade } from "./Blade";
 
 export class BladeCollection<Type extends BladeAttribute<BladeAttributeSchema>> {
   private readonly blade: Blade<any>;

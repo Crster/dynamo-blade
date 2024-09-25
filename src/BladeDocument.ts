@@ -1,18 +1,20 @@
 import {
-  DeleteCommand,
-  GetCommand,
-  PutCommand,
-  UpdateCommand,
-} from "@aws-sdk/lib-dynamodb";
-import {
   BladeAttribute,
   BladeItem,
   BladeAttributeSchema,
   BladeSchema,
 } from "./BladeAttribute";
+import {
+  DeleteCommand,
+  GetCommand,
+  PutCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
+import { BladeFieldKind } from "./BladeField";
+import { getFieldKind } from "./BladeUtility";
 import { BladeCollection } from "./BladeCollection";
-import { Blade, BladeAttributeForAdd, BladeAttributeForUpdate } from "./Blade";
 import { BladeView, DataFilter, KeyFilter } from "./BladeView";
+import { Blade, BladeAttributeForAdd, BladeAttributeForUpdate } from "./Blade";
 
 export class BladeDocument<
   Attribute extends BladeAttribute<BladeAttributeSchema>
@@ -23,8 +25,19 @@ export class BladeDocument<
     this.blade = blade;
   }
 
+  getKey(kind: BladeFieldKind) {
+    const keyValue = this.blade.getKeyValue();
+    const hashKey = getFieldKind(this.blade.table.option.keySchema, kind).at(0);
+
+    if (keyValue && hashKey) {
+      return keyValue[hashKey.field];
+    }
+  }
+
   open<T extends string & keyof BladeSchema<Attribute>>(type: T) {
-    return new BladeCollection<BladeSchema<Attribute>[T]>(this.blade.open(type));
+    return new BladeCollection<BladeSchema<Attribute>[T]>(
+      this.blade.open(type)
+    );
   }
 
   where(
