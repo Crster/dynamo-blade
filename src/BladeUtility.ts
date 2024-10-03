@@ -20,6 +20,12 @@ export type MergeUnion<U> = (U extends any ? (k: U) => void : never) extends (
 
 export type RecordOfBladeItem<T> = {
   [K in keyof T]: T[K] extends BladeAttribute<BladeAttributeSchema>
+    ? BladeItem<T[K]>
+    : T[K];
+};
+
+export type RecordOfBladeItemList<T> = {
+  [K in keyof T]: T[K] extends BladeAttribute<BladeAttributeSchema>
     ? Array<BladeItem<T[K]>>
     : T[K];
 };

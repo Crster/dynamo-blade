@@ -11,7 +11,7 @@ import {
   fillMap,
   getCondition,
   getSchemaFromTypeKey,
-  RecordOfBladeItem,
+  RecordOfBladeItemList,
 } from "./BladeUtility";
 
 export type KeyFilter =
@@ -45,7 +45,7 @@ export type ArrayResult<T extends BladeAttribute<BladeAttributeSchema>> =
 
 export type RecordResult<
   T extends Record<string, BladeAttribute<BladeAttributeSchema>>
-> = BladeResult<RecordOfBladeItem<T>>;
+> = BladeResult<RecordOfBladeItemList<T>>;
 
 export class BladeView<Attribute, Result extends BladeResult<any>> {
   private readonly blade: Blade<any>;
