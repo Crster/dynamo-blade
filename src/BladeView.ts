@@ -2,6 +2,7 @@ import { QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import {
   BladeAttribute,
   BladeAttributeSchema,
+  BladeItem,
 } from "./BladeAttribute";
 import { Blade } from "./Blade";
 import {
@@ -10,6 +11,7 @@ import {
   fillMap,
   getCondition,
   getSchemaFromTypeKey,
+  RecordOfBladeItem,
 } from "./BladeUtility";
 
 export type KeyFilter =
@@ -37,6 +39,13 @@ export interface BladeResult<Type> {
   data: Type;
   next?: string;
 }
+
+export type ArrayResult<T extends BladeAttribute<BladeAttributeSchema>> =
+  BladeResult<Array<BladeItem<T>>>;
+
+export type RecordResult<
+  T extends Record<string, BladeAttribute<BladeAttributeSchema>>
+> = BladeResult<RecordOfBladeItem<T>>;
 
 export class BladeView<Attribute, Result extends BladeResult<any>> {
   private readonly blade: Blade<any>;
@@ -72,9 +81,7 @@ export class BladeView<Attribute, Result extends BladeResult<any>> {
     return this;
   }
 
-  async get(next?: string) {
-    const ret: Result = JSON.parse(JSON.stringify(this.result));
-
+  condition(next?: string) {
     let counter: number = 0;
     let filterExpression: string;
 
@@ -158,6 +165,13 @@ export class BladeView<Attribute, Result extends BladeResult<any>> {
       });
     }
 
+    return command;
+  }
+
+  async get(next?: string) {
+    const ret: Result = JSON.parse(JSON.stringify(this.result));
+
+    const command = this.condition(next);
     const result = await this.blade.execute(command);
 
     if (result["Items"]) {

@@ -1,18 +1,24 @@
-import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { BillingMode, ProvisionedThroughput } from "@aws-sdk/client-dynamodb";
+import {
+  DeleteCommand,
+  PutCommand,
+  UpdateCommand,
+  QueryCommand,
+  ScanCommand,
+} from "@aws-sdk/lib-dynamodb";
 import { Blade } from "./Blade";
-import { BladeError } from "./BladeError";
 import { BladeDocument } from "./BladeDocument";
 import { BladeField, TypeKey } from "./BladeField";
 import { BladeCollection } from "./BladeCollection";
 import { BladeIndex, BladeIndexOption } from "./BladeIndex";
-import { BladeResult, BladeView, KeyFilter } from "./BladeView";
+import { BladeView, KeyFilter, RecordResult } from "./BladeView";
 import {
   BladeAttribute,
   BladeAttributeSchema,
   TypeFromBladeField,
 } from "./BladeAttribute";
-import { getFieldKind, MergeField, RecordOfBladeItem } from "./BladeUtility";
+import { getFieldKind, MergeField } from "./BladeUtility";
+import { DynamoBlade } from "./DynamoBlade";
 
 export interface BladeTableOption {
   keySchema: Record<string, BladeField>;
@@ -36,7 +42,7 @@ export class BladeTable<Option extends BladeTableOption> {
   public readonly option: Option;
 
   public namePrefix: string;
-  public client: DynamoDBDocumentClient;
+  public dynamoBlade: DynamoBlade;
 
   constructor(name: string, option: Option) {
     this.name = name;
@@ -57,12 +63,22 @@ export class BladeTable<Option extends BladeTableOption> {
     }
 
     const hashKey = getFieldKind(this.option.keySchema, "HashKey").at(0);
-    if (!hashKey) throw new BladeError("NO_HASHKEY", "No HASH field is set");
+    if (!hashKey)
+      this.dynamoBlade.throwError("HASH field is required", "TypeError");
 
     const typeField = getFieldKind(this.option.keySchema, "TypeKey").at(0);
     if (!typeField) {
       this.option.keySchema["_tk"] = TypeKey();
     }
+  }
+
+  transact(
+    commands: Array<
+      PutCommand | UpdateCommand | DeleteCommand | QueryCommand | ScanCommand
+    >,
+    retry?: boolean
+  ) {
+    return this.dynamoBlade.transact(commands, retry);
   }
 
   open<T extends string & keyof Option["attribute"]>(type: T) {
@@ -85,7 +101,7 @@ export class BladeTable<Option extends BladeTableOption> {
 
         return new BladeView<
           MergeField<Index["option"]["attribute"]>,
-          BladeResult<RecordOfBladeItem<Index["option"]["attribute"]>>
+          RecordResult<Index["option"]["attribute"]>
         >(blade, { count: 0, data: {} as any });
       },
     };
@@ -94,7 +110,7 @@ export class BladeTable<Option extends BladeTableOption> {
   scan<T extends string & keyof Option["index"]>(index: T) {
     return new BladeView<
       MergeField<Option["index"][T]["option"]["attribute"]>,
-      BladeResult<RecordOfBladeItem<Option["index"][T]["option"]["attribute"]>>
+      RecordResult<Option["index"][T]["option"]["attribute"]>
     >(new Blade<BladeTable<Option>>(this).setIndex(index), {
       count: 0,
       data: {} as any,

@@ -1,10 +1,9 @@
 import { Blade } from "./Blade";
 import { BladeDocument } from "./BladeDocument";
-import { BladeResult, BladeView } from "./BladeView";
+import { ArrayResult, BladeView } from "./BladeView";
 import {
   BladeAttribute,
   BladeAttributeSchema,
-  BladeItem,
 } from "./BladeAttribute";
 
 export class BladeCollection<
@@ -21,7 +20,7 @@ export class BladeCollection<
   }
 
   beginsWith(key: string) {
-    return new BladeView<Type, BladeResult<Array<BladeItem<Type>>>>(
+    return new BladeView<Type, ArrayResult<Type>>(
       this.blade.whereKey("BEGINS_WITH", key),
       {
         count: 0,
@@ -31,7 +30,7 @@ export class BladeCollection<
   }
 
   between(fromKey: string, toKey: string) {
-    return new BladeView<Type, BladeResult<Array<BladeItem<Type>>>>(
+    return new BladeView<Type, ArrayResult<Type>>(
       this.blade.whereKey("BETWEEN", [fromKey, toKey]),
       {
         count: 0,

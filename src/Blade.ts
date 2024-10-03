@@ -1,4 +1,3 @@
-import { BladeError } from "./BladeError";
 import {
   BladeAttribute,
   BladeAttributeSchema,
@@ -8,8 +7,8 @@ import {
 import { BladeTable } from "./BladeTable";
 import { BladeFieldKind } from "./BladeField";
 import { EventHandler } from "./BladeAttribute";
-import { DataFilter, KeyFilter } from "./BladeView";
-import { getCondition, getFieldKind } from "./BladeUtility";
+import { BladeView, KeyFilter } from "./BladeView";
+import { getFieldKind } from "./BladeUtility";
 
 interface KeyAttribute {
   dataType: string;
@@ -68,6 +67,10 @@ export class Blade<Option extends BladeTable<any>> {
     return clone;
   }
 
+  throwError(message: string, reason?: string) {
+    return this.table.dynamoBlade.throwError(message, reason);
+  }
+
   open(type: string) {
     const clone = this._clone();
 
@@ -80,7 +83,7 @@ export class Blade<Option extends BladeTable<any>> {
     }
 
     if (!clone.currentSchema) {
-      throw new BladeError("TYPE_UNKNOWN", "Type not found");
+      this.throwError("Type not found", "TypeError");
     }
 
     const primaryKeyField = getFieldKind(
@@ -89,10 +92,7 @@ export class Blade<Option extends BladeTable<any>> {
     ).at(0);
 
     if (!primaryKeyField) {
-      throw new BladeError(
-        "PRIMARY_KEY_UNKNOWN",
-        "No primary key for the type " + type
-      );
+      this.throwError("No primary key for the type " + type, "KeyError");
     }
 
     if (clone.dataType) {
@@ -121,7 +121,7 @@ export class Blade<Option extends BladeTable<any>> {
     value: any
   ) {
     const currentIndex = this.table.option.index[index];
-    if (!currentIndex) throw new BladeError("INDEX_UNKNOWN", "Index not found");
+    if (!currentIndex) this.throwError("Index not found", "KeyError");
 
     const hashKey = getFieldKind(currentIndex.option.keySchema, "HashKey").at(
       0
@@ -186,7 +186,7 @@ export class Blade<Option extends BladeTable<any>> {
 
   whereKey(condition: KeyFilter, value: any) {
     const key = this.keys.at(-1);
-    if (!key) throw new BladeError("KEY_MISSING", "No last key in the list");
+    if (!key) this.throwError("Key value is empty", "KeyError");
 
     if (this.scanIndexForward) {
       this.scanIndexForward = ![">", "<", ">=", "<=", "BETWEEN"].includes(
@@ -231,6 +231,17 @@ export class Blade<Option extends BladeTable<any>> {
 
   getKey() {
     return this.keys;
+  }
+
+  getKeyString() {
+    const ret = [];
+
+    const dbKey = this.getKeyValue();
+    for (const field in dbKey) {
+      ret.push(dbKey[field]);
+    }
+
+    return ret.join(":");
   }
 
   getKeyValue() {
@@ -474,7 +485,7 @@ export class Blade<Option extends BladeTable<any>> {
 
   getUpdateItem(
     value: BladeAttributeForUpdate<BladeAttribute<any>>,
-    condition?: [string, KeyFilter | DataFilter, any]
+    condition?: BladeView<any, any>
   ) {
     const typeKey = getFieldKind(this.table.option.keySchema, "TypeKey").at(0);
     const onModify = getFieldKind(this.table.option.keySchema, "OnModify");
@@ -551,15 +562,15 @@ export class Blade<Option extends BladeTable<any>> {
     for (const [k, v] of updates) {
       switch (v.type) {
         case "$set":
-          field.set.push(`#prop${field.counter}=:value${field.counter}`);
+          field.set.push(`#prop${field.counter}=:val${field.counter}`);
           attributeName.set(`#prop${field.counter}`, k);
-          attributeValues.set(`:value${field.counter}`, v.value);
+          attributeValues.set(`:val${field.counter}`, v.value);
           field.counter++;
           break;
         case "$add":
-          field.add.push(`#prop${field.counter} :value${field.counter}`);
+          field.add.push(`#prop${field.counter} :val${field.counter}`);
           attributeName.set(`#prop${field.counter}`, k);
-          attributeValues.set(`:value${field.counter}`, v.value);
+          attributeValues.set(`:val${field.counter}`, v.value);
           field.counter++;
           break;
         case "$remove":
@@ -568,9 +579,9 @@ export class Blade<Option extends BladeTable<any>> {
           field.counter++;
           break;
         case "$delete":
-          field.delete.push(`#prop${field.counter} :value${field.counter}`);
+          field.delete.push(`#prop${field.counter} :val${field.counter}`);
           attributeName.set(`#prop${field.counter}`, k);
-          attributeValues.set(`:value${field.counter}`, v.value);
+          attributeValues.set(`:val${field.counter}`, v.value);
           field.counter++;
           break;
       }
@@ -592,21 +603,29 @@ export class Blade<Option extends BladeTable<any>> {
 
     const ret = {};
     if (condition) {
-      const conditionExpression = getCondition(
-        condition[0],
-        condition[1],
-        condition[2],
-        field.counter
-      );
-      if (conditionExpression && conditionExpression.filter.length) {
-        ret["ConditionExpression"] = conditionExpression.filter[0];
+      const conditionExpression = condition.condition();
+      if (
+        conditionExpression &&
+        conditionExpression.input.ExpressionAttributeNames
+      ) {
+        ret["ConditionExpression"] = conditionExpression.input.FilterExpression;
 
-        for (const k in conditionExpression.field) {
-          attributeName.set(k, conditionExpression.field[k]);
+        for (const k in conditionExpression.input.ExpressionAttributeNames) {
+          if (conditionExpression.input.FilterExpression.includes(k)) {
+            attributeName.set(
+              k,
+              conditionExpression.input.ExpressionAttributeNames[k]
+            );
+          }
         }
 
-        for (const k in conditionExpression.values) {
-          attributeValues.set(k, conditionExpression.values[k]);
+        for (const k in conditionExpression.input.ExpressionAttributeValues) {
+          if (conditionExpression.input.FilterExpression.includes(k)) {
+            attributeValues.set(
+              k,
+              conditionExpression.input.ExpressionAttributeValues[k]
+            );
+          }
         }
       }
     }
@@ -619,7 +638,7 @@ export class Blade<Option extends BladeTable<any>> {
   }
 
   execute(command: any) {
-    return this.table.client.send(command);
+    return this.table.dynamoBlade.client.send(command);
   }
 
   buildItem<Type>(

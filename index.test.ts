@@ -1,6 +1,5 @@
-import { BladeFilter, BladeItem, BladeResult } from "./src";
+import { BladeFilter } from "./src";
 import { blade, db } from "./test/db";
-import { album } from "./test/albumType";
 
 test("test init", async () => {
   const [result] = await blade.init();
@@ -11,14 +10,11 @@ test("test add artist", async () => {
   const result = await db
     .open("artist")
     .is("akon")
-    .add(
-      {
-        name: "Akon Tiam",
-        age: 50,
-        genres: new Set(["rnb", "pop"]),
-      },
-      true
-    );
+    .add({
+      name: "Akon Tiam",
+      age: 50,
+      genres: new Set(["rnb", "pop"]),
+    });
 
   expect(result).toBe(true);
 });
@@ -179,4 +175,37 @@ test("test query global index byType", async () => {
     .get();
 
   expect(result.count).toBe(3);
+});
+
+test("test conditional update", async () => {
+  const result = await db.open("artist").is("akon").set(
+    {
+      age: 40,
+    },
+    db.open("artist").is("akon").where("age", ">", 50)
+  );
+
+  expect(result).toBe(true);
+});
+
+test("test transaction", async () => {
+  const result = await db.transact([
+    db.open("artist").is("akon").where("age", "=", 40).condition(),
+    db
+      .open("artist")
+      .is("akon")
+      .open("album")
+      .is("konvicted")
+      .setLater({ title: "Konvicted" }),
+    db
+      .open("artist")
+      .is("iyaz")
+      .addLater({
+        name: "Keidran Jones",
+        age: 37,
+        genres: new Set(["pop"]),
+      }),
+  ]);
+
+  expect(result).toBe(true);
 });
