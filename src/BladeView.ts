@@ -66,7 +66,7 @@ export class BladeView<Attribute, Result extends BladeResult<any>> {
   and(
     field: string & keyof Attribute,
     condition: KeyFilter | DataFilter,
-    value: any
+    value?: any
   ) {
     this.conditions.push({ field, condition, value, conjunction: "AND" });
     return this;
@@ -75,7 +75,7 @@ export class BladeView<Attribute, Result extends BladeResult<any>> {
   or(
     field: string & keyof Attribute,
     condition: KeyFilter | DataFilter,
-    value: any
+    value?: any
   ) {
     this.conditions.push({ field, condition, value, conjunction: "OR" });
     return this;

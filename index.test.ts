@@ -229,8 +229,9 @@ test("test find query", async () => {
     .where({
       tk: BladeFilter("=", "artist:album:song"),
     })
+    .and("downloadable", "ATTRIBUTE_EXISTS")
     .find(5);
 
   expect(result.count).toBe(3);
-  expect(result.data["artist:album:song"][0].downloadable).toBeDefined()
+  expect(result.data["artist:album:song"].at(0)?.downloadable).toBeDefined();
 });
