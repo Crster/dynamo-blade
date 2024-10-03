@@ -60,7 +60,7 @@ export class BladeView<Attribute, Result extends BladeResult<any>> {
   constructor(blade: Blade<any>, result: Result) {
     this.blade = blade;
     this.conditions = [];
-    this.result = result;
+    this.result = JSON.parse(JSON.stringify(result));
   }
 
   and(
@@ -169,7 +169,7 @@ export class BladeView<Attribute, Result extends BladeResult<any>> {
   }
 
   async get(next?: string) {
-    const ret: Result = JSON.parse(JSON.stringify(this.result));
+    const ret: Result = this.result;
 
     const command = this.condition(next);
     const result = await this.blade.execute(command);
@@ -201,6 +201,38 @@ export class BladeView<Attribute, Result extends BladeResult<any>> {
     if (result["LastEvaluatedKey"]) {
       ret.next = encodeNext(result["LastEvaluatedKey"]);
     }
+
+    return ret;
+  }
+
+  async find(limit?: number) {
+    const ret: Result = this.result;
+
+    let next: string;
+    do {
+      const result = await this.get(next);
+
+      if (result.count) {
+        if (Array.isArray(result.data)) {
+          ret.data.push(...result.data);
+        } else {
+          for (const k in result.data) {
+            if (!ret.data[k]) {
+              ret.data[k] = [];
+            }
+
+            ret.data[k].push(...result.data[k]);
+          }
+        }
+
+        ret.count += result.count;
+        if (limit && ret.count >= limit) {
+          break;
+        }
+
+        next = result.next;
+      }
+    } while (next);
 
     return ret;
   }

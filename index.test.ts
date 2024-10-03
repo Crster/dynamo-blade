@@ -222,3 +222,14 @@ test("test override key", async () => {
     data: { pk: "user", sk: "admin" },
   });
 });
+
+test("test find query", async () => {
+  const result = await db
+    .query("byType")
+    .where({
+      tk: BladeFilter("=", "artist:album:song"),
+    })
+    .find(5);
+
+  expect(result.count).toBe(3);
+});
