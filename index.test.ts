@@ -232,4 +232,5 @@ test("test find query", async () => {
     .find(5);
 
   expect(result.count).toBe(3);
+  expect(result.data["artist:album:song"][0].downloadable).toBeDefined()
 });
