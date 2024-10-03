@@ -4,7 +4,7 @@ export { BladeIndex } from "./BladeIndex";
 export { BladeTable } from "./BladeTable";
 export { BladeResult } from "./BladeView";
 export { BladeError } from "./BladeError";
-export { BladeAttribute } from "./BladeAttribute";
+export { BladeAttribute, BladeItem } from "./BladeAttribute";
 export {
   HashKey,
   SortKey,
@@ -14,9 +14,9 @@ export {
   CreatedOn,
   ModifiedOn,
   TypeKey,
-  DocumentField as MapField,
+  DocumentField,
   SetField,
-  ListField as ArrayField,
+  ListField,
   RequiredField,
   OptionalField,
 } from "./BladeField";

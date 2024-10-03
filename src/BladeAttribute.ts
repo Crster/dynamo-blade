@@ -35,7 +35,7 @@ export type TypeFromBladeField<T extends BladeField> = T["kind"] extends "List"
   : T["kind"] extends "Set"
   ? Set<TypeFromBladeAttributeSchema<T["type"]>>
   : T["kind"] extends "Document"
-  ? Map<string, TypeFromBladeAttributeSchema<T["type"]>>
+  ? TypeFromBladeAttributeSchema<T["type"]>
   : T["kind"] extends "OnCreate"
   ? T["type"] extends EventHandler
     ? ReturnType<T["type"]>

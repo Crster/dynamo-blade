@@ -1,5 +1,6 @@
-import { BladeFilter, BladeResult } from "./src";
+import { BladeFilter, BladeItem, BladeResult } from "./src";
 import { blade, db } from "./test/db";
+import { album } from "./test/albumType";
 
 test("test init", async () => {
   const [result] = await blade.init();
@@ -134,9 +135,7 @@ test("test add album and song", async () => {
 });
 
 test("test query", async () => {
-  let result: BladeResult<any>;
-
-  result = await db
+  const result = await db
     .open("artist")
     .is("akon")
     .open("album")
@@ -145,13 +144,13 @@ test("test query", async () => {
 
   expect(result.count).toBe(1);
 
-  result = await db
+  const result2 = await db
     .open("artist")
     .is("akon")
     .where("genres", "CONTAINS", "hip hop")
     .get();
 
-  expect(result.data["artist"].at(0)).toMatchObject({
+  expect(result2.data[0]).toMatchObject({
     artistId: "akon",
   });
 });

@@ -1,6 +1,5 @@
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import DynamoBlade from "../src/";
-import {
+import DynamoBlade, {
   BladeIndex,
   CreatedOn,
   HashKey,
@@ -12,6 +11,7 @@ import {
 import { artist } from "./artistType";
 import { user } from "./userType";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { song } from "./songType";
 
 export const blade = new DynamoBlade(
   DynamoDBDocumentClient.from(
@@ -36,12 +36,15 @@ export const db = blade.table(
         keySchema: {
           pk: HashKey(String),
           releaseDate: SortKey(String),
-        }
+        },
       }),
       byType: new BladeIndex("GLOBAL", {
         keySchema: {
           tk: HashKey(String),
           sk: SortKey(String),
+        },
+        attribute: {
+          "artist:album:song": song,
         },
       }),
     },

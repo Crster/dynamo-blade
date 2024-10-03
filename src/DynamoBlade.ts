@@ -4,9 +4,9 @@ import {
   GlobalSecondaryIndex,
   KeySchemaElement,
 } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { BladeError } from "./BladeError";
 import { BladeTable, BladeTableOption } from "./BladeTable";
-import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { addToAttributeDefinition, getFieldKind } from "./BladeUtility";
 
 export class DynamoBlade {

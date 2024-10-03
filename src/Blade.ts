@@ -5,11 +5,11 @@ import {
   BladeItem,
   PrimaryKeyField,
 } from "./BladeAttribute";
-import { getCondition, getFieldKind } from "./BladeUtility";
 import { BladeTable } from "./BladeTable";
-import { DataFilter, KeyFilter } from "./BladeView";
-import { EventHandler } from "./BladeAttribute";
 import { BladeFieldKind } from "./BladeField";
+import { EventHandler } from "./BladeAttribute";
+import { DataFilter, KeyFilter } from "./BladeView";
+import { getCondition, getFieldKind } from "./BladeUtility";
 
 interface KeyAttribute {
   dataType: string;
@@ -645,9 +645,9 @@ export class Blade<Option extends BladeTable<any>> {
         }
 
         if (fieldValue !== undefined) {
-          if (schema instanceof Date) {
+          if (schema === Date) {
             ret[field] = new Date(fieldValue);
-          } else if (schema["type"] instanceof Date) {
+          } else if (schema["type"] === Date) {
             ret[field] = new Date(fieldValue);
           } else {
             ret[field] = fieldValue;

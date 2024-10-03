@@ -1,18 +1,18 @@
-import { Blade } from "./Blade";
-import { BladeField, TypeKey } from "./BladeField";
-import { BladeDocument } from "./BladeDocument";
-import { BladeView, KeyFilter } from "./BladeView";
-import { BladeCollection } from "./BladeCollection";
-import { BladeIndex, BladeIndexOption } from "./BladeIndex";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { BillingMode, ProvisionedThroughput } from "@aws-sdk/client-dynamodb";
+import { Blade } from "./Blade";
+import { BladeError } from "./BladeError";
+import { BladeDocument } from "./BladeDocument";
+import { BladeField, TypeKey } from "./BladeField";
+import { BladeCollection } from "./BladeCollection";
+import { BladeIndex, BladeIndexOption } from "./BladeIndex";
+import { BladeResult, BladeView, KeyFilter } from "./BladeView";
 import {
   BladeAttribute,
   BladeAttributeSchema,
   TypeFromBladeField,
 } from "./BladeAttribute";
-import { getFieldKind } from "./BladeUtility";
-import { BladeError } from './BladeError';
+import { getFieldKind, MergeField, RecordOfBladeItem } from "./BladeUtility";
 
 export interface BladeTableOption {
   keySchema: Record<string, BladeField>;
@@ -73,7 +73,7 @@ export class BladeTable<Option extends BladeTableOption> {
 
   query<T extends string & keyof Option["index"]>(index: T) {
     return {
-      where: (key: IndexKeyFilter<Option["index"][T]>) => {
+      where: <Index extends Option["index"][T]>(key: IndexKeyFilter<Index>) => {
         const blade = new Blade<BladeTable<Option>>(this);
         for (const k in key) {
           if (key[k] instanceof BladeDocument) {
@@ -83,12 +83,21 @@ export class BladeTable<Option extends BladeTableOption> {
           }
         }
 
-        return new BladeView(blade);
+        return new BladeView<
+          MergeField<Index["option"]["attribute"]>,
+          BladeResult<RecordOfBladeItem<Index["option"]["attribute"]>>
+        >(blade, { count: 0, data: {} as any });
       },
     };
   }
 
   scan<T extends string & keyof Option["index"]>(index: T) {
-    return new BladeView(new Blade<BladeTable<Option>>(this).setIndex(index));
+    return new BladeView<
+      MergeField<Option["index"][T]["option"]["attribute"]>,
+      BladeResult<RecordOfBladeItem<Option["index"][T]["option"]["attribute"]>>
+    >(new Blade<BladeTable<Option>>(this).setIndex(index), {
+      count: 0,
+      data: {} as any,
+    });
   }
 }

@@ -1,10 +1,9 @@
+import { QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import {
   BladeAttribute,
   BladeAttributeSchema,
-  BladeItem,
 } from "./BladeAttribute";
 import { Blade } from "./Blade";
-import { QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import {
   decodeNext,
   encodeNext,
@@ -35,11 +34,11 @@ export type DataFilter =
 
 export interface BladeResult<Type> {
   count: number;
-  data: Record<string, Array<Type>>;
+  data: Type;
   next?: string;
 }
 
-export class BladeView<Attribute extends BladeAttribute<BladeAttributeSchema>> {
+export class BladeView<Attribute, Result extends BladeResult<any>> {
   private readonly blade: Blade<any>;
   private readonly conditions: Array<{
     field: string;
@@ -47,14 +46,16 @@ export class BladeView<Attribute extends BladeAttribute<BladeAttributeSchema>> {
     value: any;
     conjunction: "AND" | "OR";
   }>;
+  private readonly result: Result;
 
-  constructor(blade: Blade<any>) {
+  constructor(blade: Blade<any>, result: Result) {
     this.blade = blade;
     this.conditions = [];
+    this.result = result;
   }
 
   and(
-    field: string & keyof BladeItem<Attribute>,
+    field: string & keyof Attribute,
     condition: KeyFilter | DataFilter,
     value: any
   ) {
@@ -63,7 +64,7 @@ export class BladeView<Attribute extends BladeAttribute<BladeAttributeSchema>> {
   }
 
   or(
-    field: string & keyof BladeItem<Attribute>,
+    field: string & keyof Attribute,
     condition: KeyFilter | DataFilter,
     value: any
   ) {
@@ -72,7 +73,7 @@ export class BladeView<Attribute extends BladeAttribute<BladeAttributeSchema>> {
   }
 
   async get(next?: string) {
-    const ret: BladeResult<BladeItem<Attribute>> = { count: 0, data: {} };
+    const ret: Result = JSON.parse(JSON.stringify(this.result));
 
     let counter: number = 0;
     let filterExpression: string;
@@ -165,17 +166,21 @@ export class BladeView<Attribute extends BladeAttribute<BladeAttributeSchema>> {
 
       const groups = new Map<string, BladeAttribute<BladeAttributeSchema>>();
       for (const ii of result["Items"]) {
-        const group = ii[typeKey.field];
+        const group: string = ii[typeKey.field];
 
         if (!groups.has(group)) {
           groups.set(group, getSchemaFromTypeKey(this.blade.table, group));
         }
 
-        if (!ret.data[group]) {
-          ret.data[group] = [];
-        }
+        if (Array.isArray(ret.data)) {
+          ret.data.push(this.blade.buildItem(ii, groups.get(group)));
+        } else {
+          if (!ret.data[group]) {
+            ret.data[group] = [];
+          }
 
-        ret.data[group].push(this.blade.buildItem(ii, groups.get(group)));
+          ret.data[group].push(this.blade.buildItem(ii, groups.get(group)));
+        }
       }
     }
 

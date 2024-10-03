@@ -6,10 +6,25 @@ import { DataFilter, KeyFilter } from "./BladeView";
 import { BladeField, BladeFieldKind } from "./BladeField";
 import { BladeTable, BladeTableOption } from "./BladeTable";
 import {
+  BladeItem,
   BladeAttribute,
   BladeAttributeSchema,
   BladeAttributeSchemaValueType,
 } from "./BladeAttribute";
+
+export type MergeUnion<U> = (U extends any ? (k: U) => void : never) extends (
+  k: infer I
+) => void
+  ? I
+  : never;
+
+export type RecordOfBladeItem<T> = {
+  [K in keyof T]: T[K] extends BladeAttribute<BladeAttributeSchema>
+    ? BladeItem<T[K]>
+    : T[K];
+};
+
+export type MergeField<T> = MergeUnion<RecordOfBladeItem<T>[keyof T]>;
 
 export function BladeFilter(condition: KeyFilter, value: any) {
   return { condition, value };

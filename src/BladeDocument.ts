@@ -1,19 +1,19 @@
 import {
-  BladeAttribute,
-  BladeItem,
-  BladeAttributeSchema,
-  BladeSchema,
-} from "./BladeAttribute";
-import {
   DeleteCommand,
   GetCommand,
   PutCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
+import {
+  BladeAttribute,
+  BladeItem,
+  BladeAttributeSchema,
+  BladeSchema,
+} from "./BladeAttribute";
 import { BladeFieldKind } from "./BladeField";
 import { getFieldKind } from "./BladeUtility";
 import { BladeCollection } from "./BladeCollection";
-import { BladeView, DataFilter, KeyFilter } from "./BladeView";
+import { BladeResult, BladeView, DataFilter, KeyFilter } from "./BladeView";
 import { Blade, BladeAttributeForAdd, BladeAttributeForUpdate } from "./Blade";
 
 export class BladeDocument<
@@ -45,7 +45,13 @@ export class BladeDocument<
     condition: KeyFilter | DataFilter,
     value: any
   ) {
-    return new BladeView<Attribute>(this.blade).and(field, condition, value);
+    return new BladeView<BladeItem<Attribute>, BladeResult<Array<BladeItem<Attribute>>>>(
+      this.blade,
+      {
+        count: 0,
+        data: [],
+      }
+    ).and(field, condition, value);
   }
 
   async get(consistent?: boolean) {
