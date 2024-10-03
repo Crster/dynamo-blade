@@ -306,6 +306,22 @@ export class Blade<Option extends BladeTable<any>> {
       );
     }
 
+    const overrideField = getFieldKind(this.currentSchema.schema, "OnModify");
+    if (overrideField.length > 0) {
+      const retKeys = Object.keys(ret);
+      const tmp = JSON.parse(JSON.stringify(ret));
+
+      for (const key of this.keys) {
+        tmp[key.primaryKey] = key.value;
+      }
+
+      for (const override of overrideField) {
+        if (retKeys.includes(override.field)) {
+          ret[override.field] = this.getItemValue(tmp, override.field);
+        }
+      }
+    }
+
     return ret;
   }
 
@@ -422,6 +438,8 @@ export class Blade<Option extends BladeTable<any>> {
     fieldValue = value[field];
 
     if (schema["kind"] === "OnCreate" && fieldValue === undefined) {
+      fieldValue = schema["type"](value);
+    } else if (schema["kind"] === "OnModify") {
       fieldValue = schema["type"](value);
     }
 

@@ -64,7 +64,7 @@ export const artist = new BladeAttribute({
 ```js
 Scalar Types: String, Number, Boolean, Buffer, Date, OptionalField(), RequiredField()
 Key Types: PrimaryKey(), HashKey(), SortKey(), TypeKey(),
-Event Types: CreatedOn(), ModifiedOn(), OnCreate(), Default()
+Event Types: CreatedOn(), ModifiedOn(), Override(), Default()
 Document Types: SetField(), ListField(), DocumentField()
 
 SetField is for defining sets of the same type

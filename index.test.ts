@@ -209,3 +209,16 @@ test("test transaction", async () => {
 
   expect(result).toBe(true);
 });
+
+test("test override key", async () => {
+  const result = await db.open("user").is("admin").add({
+    name: "Super Admin",
+  });
+
+  const result2 = await db.open("user").is("admin").get(true);
+
+  expect({ success: result, data: result2 }).toMatchObject({
+    success: true,
+    data: { pk: "user", sk: "admin" },
+  });
+});

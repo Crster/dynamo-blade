@@ -9,7 +9,7 @@ export {
   HashKey,
   SortKey,
   PrimaryKey,
-  OnCreate,
+  Override,
   Default,
   CreatedOn,
   ModifiedOn,

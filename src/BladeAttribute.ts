@@ -40,6 +40,10 @@ export type TypeFromBladeField<T extends BladeField> = T["kind"] extends "List"
   ? T["type"] extends EventHandler
     ? ReturnType<T["type"]>
     : never
+  : T["kind"] extends "OnModify"
+  ? T["type"] extends EventHandler
+    ? ReturnType<T["type"]>
+    : never
   : T["type"] extends ScalarType
   ? TypeFromScalarType<T["type"]>
   : never;

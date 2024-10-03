@@ -84,8 +84,8 @@ export function ModifiedOn() {
   } as const;
 }
 
-export function OnCreate<Handler extends EventHandler>(handler: Handler) {
-  return { kind: "OnCreate", type: handler, required: false } as const;
+export function Override<Handler extends EventHandler>(handler: Handler) {
+  return { kind: "OnModify", type: handler, required: false } as const;
 }
 
 export function Default<Handler extends EventHandler>(handler: Handler) {
