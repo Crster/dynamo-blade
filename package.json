@@ -1,6 +1,6 @@
 {
   "name": "@crster/dynamo-blade",
-  "version": "0.13.0",
+  "version": "1.0.0",
   "description": "Dynamodb single-table client with added magic",
   "main": "dist/index.js",
   "scripts": {
